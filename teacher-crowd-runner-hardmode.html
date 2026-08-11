@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>선생님, 군단이 되다! (Teacher Crowd Runner) - 하드모드</title>
+<style>
+:root{
+  --bg-0:#05070d; --bg-1:#0b0f1a; --accent:#ffcf4d; --accent2:#ff5b7a;
+  --hp-bar:#ff4d6d; --legion:#4dd2ff; --danger:#ff3b3b; --good:#41ffb0;
+}
+*{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+html,body{
+  margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+  background:var(--bg-0); color:#fff;
+  font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;
+  user-select:none;
+}
+#gameWrap{
+  position:relative; width:100%; height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  background:radial-gradient(circle at 50% 20%, #16233a 0%, #05070d 70%);
+}
+#gameCanvas{
+  background:linear-gradient(180deg,#1b2a44 0%, #0d1626 60%, #050a12 100%);
+  touch-action:none; display:block;
+  box-shadow:0 0 40px rgba(0,0,0,0.6);
+  border-left:2px solid rgba(255,255,255,0.08);
+  border-right:2px solid rgba(255,255,255,0.08);
+}
+#hud{
+  position:absolute; top:0; left:0; width:100%; padding:10px 14px;
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:14px; font-weight:bold; pointer-events:none; z-index:5;
+  text-shadow:0 2px 4px rgba(0,0,0,0.8);
+}
+#hud .hudBox{ background:rgba(0,0,0,0.35); border-radius:10px; padding:6px 10px; }
+#legionCount{ color:var(--legion); font-size:16px; }
+#distLeft{ color:#fff; }
+#stopwatch{ color:var(--accent); }
+#rageBanner{
+  position:absolute; top:14%; left:50%; transform:translate(-50%,-50%) scale(0);
+  font-size:34px; font-weight:900; color:var(--accent2);
+  text-shadow:0 0 12px #ff0033, 0 0 4px #fff; z-index:8; pointer-events:none;
+  transition:transform .25s;
+}
+#rageBanner.show{ transform:translate(-50%,-50%) scale(1); }
+#overlay{
+  position:absolute; inset:0; display:none; flex-direction:column;
+  align-items:center; justify-content:center; gap:16px;
+  background:rgba(0,0,0,0.78); text-align:center; z-index:20; padding:20px;
+}
+#overlay.show{ display:flex; }
+#overlay h1{ font-size:26px; margin:0; }
+#overlay p{ font-size:15px; color:#ddd; margin:0; max-width:320px; line-height:1.5; }
+#overlay button{
+  margin-top:6px; padding:12px 28px; font-size:16px; font-weight:bold;
+  border:none; border-radius:30px; cursor:pointer;
+  background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#1a0d00;
+  box-shadow:0 4px 14px rgba(255,120,60,0.5);
+}
+#startBtnWrap button{ background:linear-gradient(135deg,#4dd2ff,#41ffb0); color:#00251a; }
+#cloudOverlay{
+  position:absolute; inset:0; background:rgba(230,230,255,0.0);
+  z-index:6; pointer-events:none; transition:background .15s;
+}
+#touchHint{
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  font-size:12px; color:rgba(255,255,255,0.6); z-index:5; pointer-events:none;
+}
+</style>
+</head>
+<body>
+<div id="gameWrap">
+  <canvas id="gameCanvas"></canvas>
+  <div id="cloudOverlay"></div>
+
+  <div id="hud">
+    <div class="hudBox" id="legionCount">군단 3명</div>
+    <div class="hudBox" id="distLeft">보스까지 9999m</div>
+    <div class="hudBox" id="stopwatch">00:00.0</div>
+  </div>
+
+  <div id="rageBanner">🔥 레이지 모드 발동! 🔥</div>
+  <div id="touchHint">← 방향키 / 마우스 이동 / 화면 드래그로 좌우 이동 →</div>
+
+  <div id="overlay" class="show">
+    <h1>선생님, 군단이 되다!</h1>
+    <p>
+      숫자 게이트를 지나 군단을 불려서 <b>기말고사 시험지</b>와 <b>교장선생님</b>을 쓰러뜨리세요!<br/>
+      움직이는 게이트, 유령 게이트, 하이리스크 게이트를 조심하고<br/>
+      군단 80명을 달성하면 3초간 무적 레이지 모드가 발동합니다.
+    </p>
+    <div id="startBtnWrap"><button id="startBtn">게임 시작 (START)</button></div>
+  </div>
+</div>
+
+<script>
+/* ================== 이미지 설정 (교체 가능) ================== */
+const TEACHER_FACES = [
+  'https://i.imgur.com/W3duRSc.png',
+  'https://i.imgur.com/8Km9tLL.png'
+];
+const teacherImgs = TEACHER_FACES.map(src=>{
+  const img = new Image();
+  img.src = src;
+  return img;
+});
+
+/* ================== 캔버스 / 기본 세팅 ================== */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const hudLegion = document.getElementById('legionCount');
+const hudDist = document.getElementById('distLeft');
+const hudTime = document.getElementById('stopwatch');
+const overlay = document.getElementById('overlay');
+const rageBanner = document.getElementById('rageBanner');
+const cloudOverlay = document.getElementById('cloudOverlay');
+const startBtn = document.getElementById('startBtn');
+
+let W, H, TRACK_W, TRACK_L, TRACK_R;
+function resize(){
+  H = window.innerHeight;
+  W = Math.min(window.innerWidth, Math.round(H*0.56));
+  canvas.width = W; canvas.height = H;
+  TRACK_W = W * 0.82;
+  TRACK_L = (W - TRACK_W)/2;
+  TRACK_R = TRACK_L + TRACK_W;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ================== 게임 상태 ================== */
+const PLAYER_Y = ()=> H*0.78;
+const DISTANCE_TO_BOSS = 6000;
+
+let state = 'idle'; // idle, run, boss1, boss2, win, lose
+let legion = 3;
+let distance = 0;
+let playerX = W/2;
+let targetX = W/2;
+let elapsed = 0;
+let clearTime = 0;
+let raged = false;
+let rageTimer = 0;
+let shake = 0;
+let cloudTimer = 0;
+
+let entities = []; // gates & obstacles
+let bombs = [];     // boss bombs
+let particles = [];
+let spawnCursor = 400;
+
+let boss = null;
+
+/* ================== 입력 처리 ================== */
+let keyLeft=false, keyRight=false, usingPointer=false;
+window.addEventListener('keydown', e=>{
+  if(e.key==='ArrowLeft') keyLeft=true;
+  if(e.key==='ArrowRight') keyRight=true;
+});
+window.addEventListener('keyup', e=>{
+  if(e.key==='ArrowLeft') keyLeft=false;
+  if(e.key==='ArrowRight') keyRight=false;
+});
+function pointerMove(clientX){
+  const rect = canvas.getBoundingClientRect();
+  usingPointer = true;
+  targetX = clientX - rect.left;
+}
+canvas.addEventListener('mousemove', e=> pointerMove(e.clientX));
+canvas.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  pointerMove(e.touches[0].clientX);
+}, {passive:false});
+canvas.addEventListener('touchstart', e=> pointerMove(e.touches[0].clientX));
+
+/* ================== 크기/색 헬퍼 ================== */
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function rand(a,b){ return a + Math.random()*(b-a); }
+function rangeGap(){ return rand(300, 460) - Math.min(120, distance*0.01); }
+
+/* ================== 게이트/장애물 생성 ================== */
+function spawnEntity(){
+  const d = distance;
+  const roll = Math.random();
+  let ent;
+  if(roll < 0.55){
+    // 일반/이동/유령/하이리스크 게이트
+    const t = Math.random();
+    let type = 'normal';
+    if(t < 0.18) type = 'moving';
+    else if(t < 0.34) type = 'ghost';
+    else if(t < 0.44) type = 'highrisk';
+
+    if(type === 'highrisk'){
+      ent = {
+        kind:'gate', type, worldY: spawnCursor, x: rand(TRACK_L+60, TRACK_R-60),
+        w: 90, op:'x3', opFail:'÷2', passed:false
+      };
+    } else {
+      const ops = genOpsPair();
+      ent = {
+        kind:'gate', type, worldY: spawnCursor,
+        x: TRACK_L + TRACK_W/2, halfW: TRACK_W/2,
+        opLeft: ops[0], opRight: ops[1],
+        vx: type==='moving' ? rand(60,110) * (Math.random()<0.5?-1:1) : 0,
+        baseX: TRACK_L + TRACK_W/2,
+        passed:false
+      };
+    }
+  } else if(roll < 0.8){
+    ent = { kind:'patrol', worldY: spawnCursor, x: rand(TRACK_L+50, TRACK_R-50), angle:0, r:34 };
+  } else {
+    ent = { kind:'cloud', worldY: spawnCursor, x: rand(TRACK_L+50, TRACK_R-50), r:40, triggered:false };
+  }
+  entities.push(ent);
+  spawnCursor += rangeGap();
+}
+function genOpsPair(){
+  const magnitudes = [10,15,20,25,30];
+  const m = magnitudes[Math.floor(Math.random()*magnitudes.length)];
+  const kind = Math.random();
+  if(kind < 0.5) return [ {op:'+', val:m}, {op:'-', val:m} ];
+  if(kind < 0.8) return [ {op:'x', val:2}, {op:'÷', val:2} ];
+  return [ {op:'+', val:m}, {op:'x', val:2} ];
+}
+function opLabel(o){
+  if(!o) return '';
+  if(o.op==='x') return 'x'+o.val;
+  if(o.op==='÷') return '÷'+o.val;
+  return o.op+o.val;
+}
+function applyOp(o){
+  if(o.op==='+') legion += o.val;
+  else if(o.op==='-') legion -= o.val;
+  else if(o.op==='x') legion = Math.round(legion*o.val);
+  else if(o.op==='÷') legion = Math.round(legion/o.val);
+  legion = Math.max(0, legion);
+}
+
+/* ================== 레이지 모드 ================== */
+function checkRage(){
+  if(!raged && legion >= 80){
+    raged = true;
+    rageTimer = 3;
+    shake = 1;
+    rageBanner.classList.add('show');
+    setTimeout(()=>rageBanner.classList.remove('show'), 1200);
+  }
+}
+
+/* ================== 보스 ================== */
+function startBoss1(){
+  state = 'boss1';
+  entities = [];
+  boss = {
+    name:'기말고사 시험지', hp:120, maxHp:120, phase:1,
+    bombTimer: 1.0, bombInterval: 1.2
+  };
+}
+function startBoss2(){
+  state = 'boss2';
+  boss = {
+    name:'교장선생님', hp:180, maxHp:180, phase:2,
+    bombTimer: 0.6, bombInterval: 0.9
+  };
+  particles.push({x:W/2,y:H*0.3,r:10,life:0.6,color:'#fff', burst:true});
+}
+function updateBoss(dt){
+  boss.bombTimer -= dt;
+  if(boss.bombTimer <= 0){
+    boss.bombTimer = boss.bombInterval;
+    const count = boss.phase===2 ? 2 : 1;
+    for(let i=0;i<count;i++){
+      bombs.push({ x: rand(TRACK_L+30, TRACK_R-30), y: H*0.18, vy: rand(160,220), r:18 });
+    }
+  }
+  for(let i=bombs.length-1;i>=0;i--){
+    const b = bombs[i];
+    b.y += b.vy*dt;
+    if(Math.abs(b.x-playerX) < b.r+22 && Math.abs(b.y-PLAYER_Y()) < b.r+22){
+      if(!raged){
+        legion = Math.max(0, legion - Math.round(rand(4,9)));
+        shake = Math.max(shake, 0.5);
+      }
+      bombs.splice(i,1);
+      continue;
+    }
+    if(b.y > H+40) bombs.splice(i,1);
+  }
+  if(legion > 0){
+    const dps = legion * 0.09 * (raged?1.6:1);
+    boss.hp -= dps*dt;
+  }
+  if(boss.hp <= 0){
+    if(boss.phase===1) startBoss2();
+    else { state='win'; clearTime = elapsed; showOverlay(); }
+  }
+}
+
+/* ================== 메인 업데이트 ================== */
+let lastT = null;
+function loop(ts){
+  if(lastT===null) lastT = ts;
+  let dt = (ts-lastT)/1000;
+  dt = Math.min(dt, 0.05);
+  lastT = ts;
+
+  if(state==='run' || state==='boss1' || state==='boss2'){
+    elapsed += dt;
+    update(dt);
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+function update(dt){
+  // 이동 처리
+  const speedBase = 320 * (raged?1.5:1);
+  if(keyLeft) targetX -= speedBase*dt*1.4;
+  if(keyRight) targetX += speedBase*dt*1.4;
+  targetX = clamp(targetX, TRACK_L+20, TRACK_R-20);
+  playerX += (targetX - playerX) * Math.min(1, dt*10);
+
+  if(raged){
+    rageTimer -= dt;
+    if(rageTimer<=0){ raged=false; shake=0; }
+  }
+  if(shake>0) shake = Math.max(0, shake-dt*1.5);
+  if(cloudTimer>0) cloudTimer -= dt;
+  cloudOverlay.style.background = cloudTimer>0 ? 'rgba(225,230,255,0.92)' : 'rgba(230,230,255,0)';
+
+  if(state==='run'){
+    const scroll = (160 + distance*0.01) * (raged?1.6:1);
+    distance += scroll*dt;
+
+    while(spawnCursor < distance + H*1.1) spawnEntity();
+
+    for(let i=entities.length-1;i>=0;i--){
+      const e = entities[i];
+      const screenY = PLAYER_Y() - (e.worldY - distance);
+      e.screenY = screenY;
+      if(e.kind==='gate' && (e.type==='moving')){
+        e.baseX += e.vx*dt;
+        if(e.baseX < TRACK_L+e.halfW*0.6 || e.baseX > TRACK_R-e.halfW*0.6) e.vx *= -1;
+        e.x = e.baseX;
+      }
+      if(e.kind==='patrol'){ e.angle += dt*4; }
+
+      handleCollision(e);
+      if(screenY > H+80) entities.splice(i,1);
+    }
+
+    checkRage();
+
+    if(distance >= DISTANCE_TO_BOSS) startBoss1();
+    if(legion <= 0){ state='lose'; showOverlay(); }
+  } else {
+    updateBoss(dt);
+    if(legion <= 0){ state='lose'; showOverlay(); }
+  }
+
+  updateParticles(dt);
+  updateHud();
+}
+
+function handleCollision(e){
+  const py = PLAYER_Y();
+  if(Math.abs(e.screenY - py) > 26) return;
+  if(e.kind==='gate' && !e.passed){
+    if(e.type==='highrisk'){
+      const gx = e.x, gw = e.w;
+      if(playerX > gx-gw/2 && playerX < gx+gw/2){
+        e.passed = true;
+        legion = Math.round(legion*3);
+        spawnBurst(e.x, py, '#41ffb0');
+      } else if(Math.abs(playerX-gx) < gw){
+        e.passed = true;
+        legion = Math.max(0, Math.round(legion/2));
+        spawnBurst(e.x, py, '#ff3b3b');
+      }
+    } else {
+      const isLeft = playerX < e.x;
+      const chosen = isLeft ? e.opLeft : e.opRight;
+      e.passed = true;
+      const realOp = (e.type==='ghost') ? invertOp(chosen) : chosen;
+      applyOp(realOp);
+      spawnBurst(playerX, py, realOp.op==='-'||realOp.op==='÷' ? '#ff3b3b' : '#41ffb0');
+    }
+  } else if(e.kind==='patrol' && !e.hit){
+    const dx = playerX - e.x, dy = py - e.screenY;
+    if(Math.hypot(dx,dy) < e.r+18){
+      if(raged){
+        e.hit = true; e.worldY = -9999;
+        spawnBurst(e.x, e.screenY, '#ffcf4d');
+      } else {
+        e.hit = true;
+        legion = Math.max(0, legion - Math.round(legion*0.15) - 2);
+        spawnBurst(e.x, e.screenY, '#ff3b3b');
+      }
+    }
+  } else if(e.kind==='cloud' && !e.triggered){
+    const dx = playerX - e.x, dy = py - e.screenY;
+    if(Math.hypot(dx,dy) < e.r+18){
+      e.triggered = true;
+      if(!raged) cloudTimer = 1.0;
+    }
+  }
+}
+function invertOp(o){
+  if(o.op==='+') return {op:'-', val:o.val};
+  if(o.op==='-') return {op:'+', val:o.val};
+  if(o.op==='x') return {op:'÷', val:o.val};
+  if(o.op==='÷') return {op:'x', val:o.val};
+  return o;
+}
+function spawnBurst(x,y,color){
+  for(let i=0;i<10;i++){
+    particles.push({x,y,vx:rand(-120,120),vy:rand(-160,-20),r:rand(2,5),life:0.5,color});
+  }
+}
+function updateParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.life -= dt;
+    if(p.vx!==undefined){ p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=300*dt; }
+    if(p.life<=0) particles.splice(i,1);
+  }
+}
+
+/* ================== HUD ================== */
+function updateHud(){
+  hudLegion.textContent = `군단 ${legion}명`;
+  if(state==='run'){
+    hudDist.textContent = `보스까지 ${Math.max(0,Math.round(DISTANCE_TO_BOSS-distance))}m`;
+  } else if(state==='boss1' || state==='boss2'){
+    hudDist.textContent = `${boss.name} HP ${Math.max(0,Math.ceil(boss.hp))}/${boss.maxHp}`;
+  }
+  const m = Math.floor(elapsed/60), s = elapsed%60;
+  hudTime.textContent = `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;
+}
+
+/* ================== 렌더링 ================== */
+function render(){
+  ctx.save();
+  if(shake>0){
+    ctx.translate(rand(-1,1)*shake*8, rand(-1,1)*shake*8);
+  }
+  ctx.clearRect(-20,-20,W+40,H+40);
+
+  // 트랙
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0,'#1b2a44'); grad.addColorStop(1,'#050a12');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.fillRect(TRACK_L,0,TRACK_W,H);
+  ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(TRACK_L,0); ctx.lineTo(TRACK_L,H);
+  ctx.moveTo(TRACK_R,0); ctx.lineTo(TRACK_R,H); ctx.stroke();
+
+  if(state==='run') entities.forEach(drawEntity);
+  if(state==='boss1'||state==='boss2'){ drawBoss(); bombs.forEach(drawBomb); }
+
+  drawPlayerCrowd();
+  particles.forEach(p=>{
+    ctx.globalAlpha = clamp(p.life/0.5,0,1);
+    ctx.fillStyle = p.color; ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
+    ctx.globalAlpha=1;
+  });
+  ctx.restore();
+}
+
+function drawEntity(e){
+  const y = e.screenY;
+  if(y < -80 || y > H+80) return;
+  if(e.kind==='gate'){
+    if(e.type==='highrisk'){
+      ctx.fillStyle = e.passed ? 'rgba(255,255,255,0.15)' : 'rgba(255,80,80,0.75)';
+      ctx.fillRect(e.x-e.w/2, y-14, e.w, 28);
+      ctx.fillStyle='#fff'; ctx.font='bold 14px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('위험! x3 / ÷2', e.x, y+5);
+    } else {
+      const cx = e.x, hw = e.halfW;
+      const leftColor = colorForOp(e.opLeft);
+      const rightColor = colorForOp(e.opRight);
+      ctx.fillStyle = e.type==='ghost' ? 'rgba(160,120,255,0.65)' : leftColor;
+      ctx.fillRect(cx-hw, y-14, hw, 28);
+      ctx.fillStyle = e.type==='ghost' ? 'rgba(160,120,255,0.4)' : rightColor;
+      ctx.fillRect(cx, y-14, hw, 28);
+      ctx.strokeStyle='#fff'; ctx.beginPath(); ctx.moveTo(cx,y-14); ctx.lineTo(cx,y+14); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font='bold 15px sans-serif'; ctx.textAlign='center';
+      const tag = e.type==='ghost' ? '❓' : (e.type==='moving' ? '↔' : '');
+      ctx.fillText(tag+opLabel(e.opLeft), cx-hw/2, y+5);
+      ctx.fillText(tag+opLabel(e.opRight), cx+hw/2, y+5);
+    }
+  } else if(e.kind==='patrol'){
+    ctx.save();
+    ctx.translate(e.x,y); ctx.rotate(e.angle);
+    ctx.fillStyle = e.hit ? 'rgba(150,150,150,0.3)' : '#ffcf4d';
+    ctx.fillRect(-e.r,-6,e.r*2,12);
+    ctx.fillRect(-6,-e.r,12,e.r*2);
+    ctx.restore();
+    ctx.fillStyle='#fff'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('선도부', e.x, y+e.r+14);
+  } else if(e.kind==='cloud'){
+    ctx.fillStyle = e.triggered? 'rgba(255,255,255,0.15)':'rgba(220,220,255,0.55)';
+    ctx.beginPath(); ctx.arc(e.x,y,e.r,0,7); ctx.fill();
+    ctx.fillStyle='#334'; ctx.font='11px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('졸음구름', e.x, y+4);
+  }
+}
+function colorForOp(o){
+  if(o.op==='+'||o.op==='x') return 'rgba(70,200,120,0.75)';
+  return 'rgba(220,70,70,0.75)';
+}
+function drawBomb(b){
+  ctx.fillStyle='#ffb84d';
+  ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,7); ctx.fill();
+  ctx.fillStyle='#3a2200'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('숙제', b.x, b.y+4);
+}
+function drawBoss(){
+  const bx = W/2, by = H*0.22;
+  if(boss.phase===1){
+    ctx.fillStyle='#f5f0e0';
+    ctx.fillRect(bx-90, by-70, 180, 130);
+    ctx.strokeStyle='#333'; ctx.lineWidth=3; ctx.strokeRect(bx-90, by-70, 180, 130);
+    ctx.fillStyle='#c0392b'; ctx.font='bold 20px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('기말고사', bx, by-10);
+    ctx.fillStyle='#333'; ctx.font='14px sans-serif';
+    ctx.fillText('100점 만점에 0점', bx, by+20);
+  } else {
+    ctx.fillStyle='#5b3a29';
+    ctx.beginPath(); ctx.arc(bx, by, 60, 0, 7); ctx.fill();
+    ctx.fillStyle='#ffd9b3';
+    ctx.beginPath(); ctx.arc(bx, by-10, 34, 0, 7); ctx.fill();
+    ctx.fillStyle='#222'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('교장', bx, by-6);
+    ctx.fillStyle='#fff'; ctx.font='13px sans-serif';
+    ctx.fillText('교장선생님', bx, by+80);
+  }
+  // HP bar
+  const barW = TRACK_W*0.8, barX = W/2-barW/2, barY = by+95;
+  ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(barX,barY,barW,14);
+  ctx.fillStyle='#ff4d6d'; ctx.fillRect(barX,barY, barW*clamp(boss.hp/boss.maxHp,0,1),14);
+  ctx.strokeStyle='#fff'; ctx.strokeRect(barX,barY,barW,14);
+}
+
+function drawPlayerCrowd(){
+  const py = PLAYER_Y();
+  const n = clamp(Math.min(legion,150),1,150);
+  const cols = Math.ceil(Math.sqrt(n*1.4));
+  const spacing = 13;
+  let idx=0;
+  const startAngle = Date.now()*0.0015;
+  for(let ring=0; idx<n; ring++){
+    const count = ring===0?1: ring*6;
+    for(let k=0;k<count && idx<n; k++, idx++){
+      let px, pyy;
+      if(ring===0){ px=playerX; pyy=py; }
+      else {
+        const ang = startAngle + (k/count)*Math.PI*2;
+        const rad = ring*spacing;
+        px = playerX + Math.cos(ang)*rad;
+        pyy = py + Math.sin(ang)*rad*0.6;
+      }
+      drawFace(px,pyy, idx===0?15:10);
+    }
+  }
+  if(legion>150){
+    ctx.fillStyle='#fff'; ctx.font='bold 13px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`+${legion-150}`, playerX, py-70);
+  }
+  if(raged){
+    ctx.strokeStyle='rgba(255,80,80,0.8)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(playerX,py, 100, 0, 7); ctx.stroke();
+  }
+}
+function drawFace(x,y,r){
+  const img = teacherImgs[Math.floor(Math.abs(Math.sin(x*13+y*7))*teacherImgs.length) % teacherImgs.length];
+  ctx.save();
+  ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.closePath(); ctx.clip();
+  if(img && img.complete && img.naturalWidth>0){
+    ctx.drawImage(img, x-r, y-r, r*2, r*2);
+  } else {
+    ctx.fillStyle='#ffd9b3'; ctx.fillRect(x-r,y-r,r*2,r*2);
+  }
+  ctx.restore();
+  ctx.strokeStyle= raged? '#ff3b3b':'rgba(255,255,255,0.6)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(x,y,r,0,7); ctx.stroke();
+}
+
+/* ================== 오버레이 / 리셋 ================== */
+function showOverlay(){
+  overlay.classList.add('show');
+  const h1 = overlay.querySelector('h1');
+  const p = overlay.querySelector('p');
+  const wrap = document.getElementById('startBtnWrap');
+  if(state==='win'){
+    h1.textContent = '🎉 하드모드 클리어! 🎉';
+    p.innerHTML = `<b>${clearTime.toFixed(1)}초</b> 만에 하드모드 클리어!<br/>축제 최고 피지컬 인증!`;
+  } else {
+    h1.textContent = '😵 전멸...';
+    p.innerHTML = '군단이 전멸했습니다.<br/>재도전하여 랭킹에 이름을 올리세요!';
+  }
+  wrap.innerHTML = '<button id="resetBtn">다시 시작 (RESET)</button>';
+  document.getElementById('resetBtn').addEventListener('click', resetGame);
+}
+function resetGame(){
+  legion = 3; distance = 0; elapsed = 0; clearTime = 0;
+  raged = false; rageTimer = 0; shake = 0; cloudTimer = 0;
+  entities = []; bombs = []; particles = [];
+  spawnCursor = 400;
+  playerX = W/2; targetX = W/2;
+  boss = null;
+  overlay.classList.remove('show');
+  state = 'run';
+}
+startBtn.addEventListener('click', ()=>{
+  resetGame();
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
