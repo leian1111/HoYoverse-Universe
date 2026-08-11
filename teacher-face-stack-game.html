@@ -277,14 +277,15 @@ canvas {
   const CW = canvas.width;
   const CH = canvas.height;
 
-  const BLOCK_HEIGHT = 26;
-  const INITIAL_WIDTH = 240;
+  const BLOCK_HEIGHT = 34;
+  const INITIAL_WIDTH = 312;
   const MIN_SPAWN_Y_SCREEN_LIMIT = 190;
   const BASE_BOTTOM_Y = CH - 60;
-  const PERFECT_EPS = 6;
-  const RECOVER_AMOUNT = 26;
-  const BASE_SPEED = 2.6;
-  const MAX_SPEED_BONUS = 3.4;
+  const PERFECT_EPS = 8;
+  const RECOVER_AMOUNT = 34;
+  const BASE_SPEED = 2.8;
+  const SPEED_GROWTH_PER_BLOCK = 0.065;
+  const MAX_SPEED = 13;
 
   const scoreEl = document.getElementById("score-value");
   const bestEl = document.getElementById("best-value");
@@ -341,7 +342,7 @@ canvas {
     const width = s.currentWidth;
     const dir = Math.random() < 0.5 ? 1 : -1;
     const left = dir === 1 ? 0 : (CW - width);
-    const speed = BASE_SPEED + Math.min(MAX_SPEED_BONUS, s.totalPlaced * 0.03);
+    const speed = Math.min(MAX_SPEED, BASE_SPEED + s.totalPlaced * SPEED_GROWTH_PER_BLOCK);
     s.mover = { left, width, dir, speed };
   }
 
@@ -583,37 +584,167 @@ canvas {
      렌더링
   ========================================================= */
   function drawBackground(t) {
-    const grad = ctx.createLinearGradient(0, 0, 0, CH);
-    grad.addColorStop(0, "#2a1458");
-    grad.addColorStop(0.5, "#3d1f6e");
-    grad.addColorStop(1, "#160a2e");
-    ctx.fillStyle = grad;
+    const sky = ctx.createLinearGradient(0, 0, 0, CH);
+    sky.addColorStop(0, "#6fc3ff");
+    sky.addColorStop(0.55, "#bfe8ff");
+    sky.addColorStop(1, "#eaf7e6");
+    ctx.fillStyle = sky;
     ctx.fillRect(0, 0, CW, CH);
 
+    // 해
     ctx.save();
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = "#fff3b0";
+    ctx.beginPath();
+    ctx.arc(CW - 70, 70, 42, 0, Math.PI * 2);
+    ctx.fill();
     ctx.globalAlpha = 0.25;
-    for (let i = 0; i < 40; i++) {
-      const x = (i * 53 + (t * 6) % 480) % CW;
-      const y = (i * 97 + (t * 3) % 720) % CH;
-      const r = 1 + (i % 3);
-      ctx.fillStyle = "#fff";
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.beginPath();
+    ctx.arc(CW - 70, 70, 62, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
 
+    // 구름
     ctx.save();
-    ctx.globalAlpha = 0.12;
-    ctx.strokeStyle = "#ffd86f";
-    ctx.lineWidth = 3;
-    for (let i = 0; i < 3; i++) {
-      const cx = 80 + i * 160 + Math.sin(t * 0.001 + i) * 20;
-      ctx.beginPath();
-      ctx.moveTo(cx, 0);
-      ctx.lineTo(cx, CH);
-      ctx.stroke();
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const cloudDrift = (t * 0.006) % (CW + 160);
+    [[0.15, 90, 1], [0.55, 130, 0.75], [0.85, 60, 1.15]].forEach(([xr, y, scale]) => {
+      const cx = ((CW * xr + cloudDrift) % (CW + 160)) - 80;
+      drawCloud(cx, y, scale);
+    });
+    ctx.restore();
+
+    // 운동장 트랙
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = "#ff9f6b";
+    ctx.lineWidth = 10;
+    ctx.beginPath();
+    ctx.ellipse(CW / 2, CH - 30, CW * 0.62, 26, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // 잔디
+    const grassTop = CH - 92;
+    const grass = ctx.createLinearGradient(0, grassTop, 0, CH);
+    grass.addColorStop(0, "#8fd66b");
+    grass.addColorStop(1, "#5fae46");
+    ctx.fillStyle = grass;
+    ctx.fillRect(0, grassTop, CW, CH - grassTop);
+
+    // 학교 건물 (배경 뒤쪽)
+    drawSchoolBuilding(t, grassTop);
+
+    // 나무
+    drawTree(46, grassTop + 6, 1);
+    drawTree(CW - 46, grassTop + 6, -1);
+  }
+
+  function drawCloud(cx, cy, scale) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.scale(scale, scale);
+    ctx.beginPath();
+    ctx.arc(0, 0, 18, Math.PI * 0.5, Math.PI * 1.5);
+    ctx.arc(16, -14, 16, Math.PI, Math.PI * 2);
+    ctx.arc(36, 0, 18, Math.PI * 1.5, Math.PI * 0.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawTree(cx, groundY, side) {
+    ctx.save();
+    ctx.fillStyle = "#8a5a3b";
+    ctx.fillRect(cx - 6, groundY - 34, 12, 34);
+    ctx.fillStyle = "#5fae46";
+    ctx.beginPath();
+    ctx.arc(cx, groundY - 44, 22, 0, Math.PI * 2);
+    ctx.arc(cx - 16 * side, groundY - 34, 16, 0, Math.PI * 2);
+    ctx.arc(cx + 16 * side, groundY - 34, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSchoolBuilding(t, groundY) {
+    const buildingW = CW * 0.72;
+    const buildingH = 170;
+    const bx = (CW - buildingW) / 2;
+    const by = groundY - buildingH;
+
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+
+    // 본관 벽
+    const wall = ctx.createLinearGradient(0, by, 0, by + buildingH);
+    wall.addColorStop(0, "#fef3d9");
+    wall.addColorStop(1, "#fbe3ad");
+    ctx.fillStyle = wall;
+    ctx.fillRect(bx, by, buildingW, buildingH);
+
+    // 지붕
+    ctx.fillStyle = "#e8734f";
+    ctx.beginPath();
+    ctx.moveTo(bx - 14, by);
+    ctx.lineTo(bx + buildingW / 2, by - 46);
+    ctx.lineTo(bx + buildingW + 14, by);
+    ctx.closePath();
+    ctx.fill();
+
+    // 시계
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(bx + buildingW / 2, by - 8, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#5a3d2b";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(bx + buildingW / 2, by - 8);
+    ctx.lineTo(bx + buildingW / 2, by - 17);
+    ctx.moveTo(bx + buildingW / 2, by - 8);
+    ctx.lineTo(bx + buildingW / 2 + 7, by - 8);
+    ctx.stroke();
+
+    // 창문
+    const cols = 7, rows = 3;
+    const padX = buildingW * 0.08, padY = 18;
+    const cellW = (buildingW - padX * 2) / cols;
+    const cellH = (buildingH - padY * 2 - 26) / rows;
+    ctx.fillStyle = "#7fd6e0";
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (r === rows - 1 && c === Math.floor(cols / 2)) continue; // 정문 자리
+        const wx = bx + padX + c * cellW + cellW * 0.12;
+        const wy = by + padY + r * cellH;
+        ctx.fillRect(wx, wy, cellW * 0.76, cellH * 0.68);
+      }
     }
+
+    // 정문
+    const doorW = cellW * 0.9;
+    ctx.fillStyle = "#8a5a3b";
+    ctx.fillRect(bx + buildingW / 2 - doorW / 2, by + buildingH - 30, doorW, 30);
+
+    // 국기 게양대 + 깃발 (바람에 흔들림)
+    const poleX = bx + buildingW + 34;
+    const poleTopY = by - 70;
+    ctx.strokeStyle = "#c9c9c9";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(poleX, groundY);
+    ctx.lineTo(poleX, poleTopY);
+    ctx.stroke();
+
+    const wave = Math.sin(t * 0.003) * 6;
+    ctx.fillStyle = "#ff6b6b";
+    ctx.beginPath();
+    ctx.moveTo(poleX, poleTopY + 4);
+    ctx.quadraticCurveTo(poleX + 26, poleTopY + 6 + wave, poleX + 30, poleTopY + 20);
+    ctx.lineTo(poleX, poleTopY + 24);
+    ctx.closePath();
+    ctx.fill();
+
     ctx.restore();
   }
 
