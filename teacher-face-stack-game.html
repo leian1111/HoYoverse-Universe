@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>선생님 얼굴 완성 탑 쌓기</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Nunito:wght@400;700;900&display=swap');
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 20% 10%, #3a1c71 0%, #1a0933 45%, #0a0518 100%);
+  font-family: 'Nunito', sans-serif;
+  overflow: hidden;
+}
+
+#game-wrap {
+  position: relative;
+  width: 480px;
+  height: 720px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 4px rgba(255, 215, 130, 0.8),
+    0 0 40px 10px rgba(255, 100, 200, 0.5),
+    0 20px 60px rgba(0,0,0,0.6);
+  background: #111;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  pointer-events: none;
+  z-index: 5;
+  font-family: 'Black Han Sans', sans-serif;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+}
+
+#hud .box {
+  background: linear-gradient(135deg, rgba(255,255,255,0.18), rgba(255,255,255,0.05));
+  border: 2px solid rgba(255,255,255,0.35);
+  border-radius: 12px;
+  padding: 6px 14px;
+  backdrop-filter: blur(3px);
+}
+
+#hud .score-box { text-align: left; }
+#hud .score-box .label { font-size: 12px; opacity: 0.85; letter-spacing: 1px; }
+#hud .score-box .value { font-size: 26px; line-height: 1; }
+#hud .best-box { text-align: right; }
+#hud .best-box .label { font-size: 12px; opacity: 0.85; }
+#hud .best-box .value { font-size: 20px; }
+
+#teacher-banner {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  color: #fff8e0;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 18px;
+  padding: 6px 20px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(255, 90, 160, 0.85), rgba(120, 50, 220, 0.85));
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+#combo-display {
+  position: absolute;
+  top: 130px;
+  left: 50%;
+  transform: translateX(-50%) scale(1);
+  z-index: 5;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 30px;
+  color: #ffe066;
+  text-shadow: 0 0 10px #ff9f1c, 0 2px 4px rgba(0,0,0,0.6);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+#combo-display.show {
+  opacity: 1;
+  transform: translateX(-50%) scale(1.15);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  color: #fff;
+  background: linear-gradient(160deg, rgba(20,10,40,0.92), rgba(5,2,15,0.95));
+  padding: 30px;
+}
+
+.overlay h1 {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 40px;
+  margin: 0;
+  background: linear-gradient(90deg, #ff6ec4, #ffd86f, #7bf1a8, #6ec9ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+}
+
+.overlay p {
+  font-size: 16px;
+  line-height: 1.6;
+  max-width: 340px;
+  opacity: 0.9;
+}
+
+.overlay .stats {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 22px;
+  color: #ffe066;
+  margin: 4px 0;
+}
+
+.btn {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 20px;
+  padding: 12px 34px;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  color: #2a1200;
+  background: linear-gradient(135deg, #ffe066, #ff9f1c);
+  box-shadow: 0 6px 0 #b35c00, 0 10px 20px rgba(0,0,0,0.4);
+  transition: transform 0.08s ease;
+}
+.btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #b35c00, 0 4px 10px rgba(0,0,0,0.4);
+}
+
+#start-overlay .sub {
+  font-size: 13px;
+  opacity: 0.7;
+  margin-top: -6px;
+}
+
+#gameover-overlay { display: none; }
+
+#celebrate-toast {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.6);
+  z-index: 8;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 32px;
+  color: #fff;
+  text-align: center;
+  padding: 20px 30px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(255,110,196,0.92), rgba(110,201,255,0.92));
+  box-shadow: 0 0 40px rgba(255,255,255,0.6), 0 10px 30px rgba(0,0,0,0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  white-space: nowrap;
+}
+#celebrate-toast.show {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+#hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  color: rgba(255,255,255,0.65);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<div id="game-wrap">
+  <canvas id="game-canvas" width="480" height="720"></canvas>
+
+  <div id="hud">
+    <div class="box score-box">
+      <div class="label">SCORE</div>
+      <div class="value" id="score-value">0</div>
+    </div>
+    <div class="box best-box">
+      <div class="label">BEST</div>
+      <div class="value" id="best-value">0</div>
+    </div>
+  </div>
+
+  <div id="teacher-banner">🏫 김00 선생님 얼굴 완성 중...</div>
+  <div id="combo-display">PERFECT!</div>
+  <div id="celebrate-toast"></div>
+  <div id="hint">클릭 / 탭 / 스페이스바로 블록을 쌓으세요</div>
+
+  <div id="start-overlay" class="overlay">
+    <h1>선생님 얼굴<br>완성 탑 쌓기</h1>
+    <p>좌우로 움직이는 블록을 정확한 타이밍에 쌓아<br>선생님들의 사진을 완성해보세요!<br>완벽하게 맞추면 PERFECT 콤보가 쌓이고,<br>3연속 PERFECT 시 블록 크기가 회복됩니다.</p>
+    <button class="btn" id="start-btn">게임 시작</button>
+    <div class="sub">Click / Tap / Space</div>
+  </div>
+
+  <div id="gameover-overlay" class="overlay">
+    <h1>GAME OVER</h1>
+    <div class="stats">최종 점수: <span id="final-score">0</span></div>
+    <div class="stats">완성한 선생님: <span id="final-teachers">0</span> 명</div>
+    <p id="final-best-msg"></p>
+    <button class="btn" id="restart-btn">다시 하기</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* =========================================================
+     선생님 사진 데이터
+  ========================================================= */
+  const TEACHERS = [
+    { name: "김00 선생님", url: "https://via.placeholder.com/300x400/FF6B6B/FFFFFF?text=Teacher+1", layers: 20 },
+    { name: "이00 선생님", url: "https://via.placeholder.com/300x400/4ECDC4/FFFFFF?text=Teacher+2", layers: 24 },
+    { name: "박00 선생님", url: "https://via.placeholder.com/300x400/FFE66D/000000?text=Teacher+3", layers: 20 },
+    { name: "최00 선생님", url: "https://via.placeholder.com/300x400/A29BFE/FFFFFF?text=Teacher+4", layers: 28 },
+    { name: "정00 선생님", url: "https://via.placeholder.com/300x400/FD79A8/FFFFFF?text=Teacher+5", layers: 22 }
+  ];
+
+  TEACHERS.forEach(t => {
+    t.img = new Image();
+    t.img.crossOrigin = "anonymous";
+    t.img.src = t.url;
+    t.loaded = false;
+    t.img.onload = () => { t.loaded = true; };
+  });
+
+  /* =========================================================
+     기본 설정
+  ========================================================= */
+  const canvas = document.getElementById("game-canvas");
+  const ctx = canvas.getContext("2d");
+  const CW = canvas.width;
+  const CH = canvas.height;
+
+  const BLOCK_HEIGHT = 26;
+  const INITIAL_WIDTH = 240;
+  const MIN_SPAWN_Y_SCREEN_LIMIT = 190;
+  const BASE_BOTTOM_Y = CH - 60;
+  const PERFECT_EPS = 6;
+  const RECOVER_AMOUNT = 26;
+  const BASE_SPEED = 2.6;
+  const MAX_SPEED_BONUS = 3.4;
+
+  const scoreEl = document.getElementById("score-value");
+  const bestEl = document.getElementById("best-value");
+  const teacherBanner = document.getElementById("teacher-banner");
+  const comboDisplay = document.getElementById("combo-display");
+  const celebrateToast = document.getElementById("celebrate-toast");
+  const startOverlay = document.getElementById("start-overlay");
+  const gameoverOverlay = document.getElementById("gameover-overlay");
+  const finalScoreEl = document.getElementById("final-score");
+  const finalTeachersEl = document.getElementById("final-teachers");
+  const finalBestMsgEl = document.getElementById("final-best-msg");
+
+  let BEST = parseInt(localStorage.getItem("teacherStackBest") || "0", 10);
+  bestEl.textContent = BEST;
+
+  /* =========================================================
+     게임 상태
+  ========================================================= */
+  let state = null;
+
+  function freshState() {
+    return {
+      running: false,
+      gameOver: false,
+      score: 0,
+      teacherIndex: 0,
+      localIndex: 0,           // 현재 선생님 내에서 몇 번째 층인지 (0-based)
+      completedTeachers: 0,
+      comboCount: 0,
+      currentWidth: INITIAL_WIDTH,
+      stack: [],                // 쌓인 블록들 {left, width, teacherIndex, localIndex, refLeft, refWidth}
+      segmentRef: { left: 0, width: INITIAL_WIDTH },
+      mover: null,               // 움직이는 블록
+      particles: [],
+      cameraOffset: 0,
+      totalPlaced: 0,
+      shakeT: 0
+    };
+  }
+
+  function initBaseBlock(s) {
+    const left = (CW - INITIAL_WIDTH) / 2;
+    const baseBlock = {
+      left, width: INITIAL_WIDTH,
+      teacherIndex: 0, localIndex: 0,
+      refLeft: left, refWidth: INITIAL_WIDTH
+    };
+    s.stack.push(baseBlock);
+    s.segmentRef = { left, width: INITIAL_WIDTH };
+    s.localIndex = 1; // 다음에 놓일 블록의 로컬 인덱스
+  }
+
+  function spawnMover(s) {
+    const width = s.currentWidth;
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    const left = dir === 1 ? 0 : (CW - width);
+    const speed = BASE_SPEED + Math.min(MAX_SPEED_BONUS, s.totalPlaced * 0.03);
+    s.mover = { left, width, dir, speed };
+  }
+
+  function getTopBlock(s) {
+    return s.stack[s.stack.length - 1];
+  }
+
+  function computeCameraOffset(s) {
+    const topIndex = s.stack.length; // 다음 블록이 들어갈 인덱스
+    const screenTopY = BASE_BOTTOM_Y - (topIndex + 1) * BLOCK_HEIGHT;
+    return Math.max(0, MIN_SPAWN_Y_SCREEN_LIMIT - screenTopY);
+  }
+
+  function blockScreenRect(s, index, camOffset) {
+    const bottom = BASE_BOTTOM_Y - index * BLOCK_HEIGHT + camOffset;
+    const top = bottom - BLOCK_HEIGHT;
+    return { top, bottom };
+  }
+
+  /* =========================================================
+     입력 처리
+  ========================================================= */
+  function dropBlock() {
+    if (!state || !state.running || state.gameOver || !state.mover) return;
+
+    const s = state;
+    const mover = s.mover;
+    const below = getTopBlock(s);
+
+    const movingLeft = mover.left;
+    const movingRight = mover.left + mover.width;
+    const belowLeft = below.left;
+    const belowRight = below.left + below.width;
+
+    const overlapLeft = Math.max(movingLeft, belowLeft);
+    const overlapRight = Math.min(movingRight, belowRight);
+    const overlapWidth = overlapRight - overlapLeft;
+
+    if (overlapWidth <= 4) {
+      triggerGameOver();
+      return;
+    }
+
+    const isPerfect = Math.abs(movingLeft - belowLeft) <= PERFECT_EPS;
+
+    let newLeft, newWidth;
+    if (isPerfect) {
+      newLeft = belowLeft;
+      newWidth = below.width;
+      s.comboCount++;
+      spawnEdgeParticles(overlapLeft, overlapRight, s);
+      showComboText(s.comboCount);
+
+      if (s.comboCount > 0 && s.comboCount % 3 === 0) {
+        const grown = Math.min(INITIAL_WIDTH, newWidth + RECOVER_AMOUNT);
+        const center = newLeft + newWidth / 2;
+        newWidth = grown;
+        newLeft = Math.max(0, Math.min(CW - newWidth, center - newWidth / 2));
+        spawnRecoverParticles(s);
+      }
+    } else {
+      newLeft = overlapLeft;
+      newWidth = overlapWidth;
+      s.comboCount = 0;
+      hideComboText();
+      spawnCutParticle(mover, overlapLeft, overlapRight, s);
+    }
+
+    s.currentWidth = newWidth;
+
+    const placedBlock = {
+      left: newLeft,
+      width: newWidth,
+      teacherIndex: s.teacherIndex,
+      localIndex: s.localIndex,
+      refLeft: s.segmentRef.left,
+      refWidth: s.segmentRef.width
+    };
+    s.stack.push(placedBlock);
+    s.score++;
+    s.totalPlaced++;
+    scoreEl.textContent = s.score;
+
+    const teacher = TEACHERS[s.teacherIndex];
+    const isTeacherComplete = s.localIndex >= teacher.layers - 1;
+
+    if (isTeacherComplete) {
+      s.completedTeachers++;
+      celebrateTeacher(teacher.name, s);
+      s.teacherIndex = (s.teacherIndex + 1) % TEACHERS.length;
+      s.localIndex = 0;
+      s.segmentRef = { left: newLeft, width: newWidth };
+      s.currentWidth = INITIAL_WIDTH;
+      updateBannerText(s);
+    } else {
+      s.localIndex++;
+      updateBannerText(s);
+    }
+
+    spawnMover(s);
+
+    s.cameraOffset = computeCameraOffset(s);
+  }
+
+  function triggerGameOver() {
+    const s = state;
+    s.gameOver = true;
+    s.running = false;
+    s.mover = null;
+
+    if (s.score > BEST) {
+      BEST = s.score;
+      localStorage.setItem("teacherStackBest", String(BEST));
+    }
+
+    bestEl.textContent = BEST;
+    finalScoreEl.textContent = s.score;
+    finalTeachersEl.textContent = s.completedTeachers;
+    finalBestMsgEl.textContent = (s.score >= BEST && s.score > 0) ? "🎉 최고 기록 달성!" : `최고 기록: ${BEST}`;
+    gameoverOverlay.style.display = "flex";
+  }
+
+  /* =========================================================
+     연출: 콤보 텍스트 / 파티클 / 선생님 완성 축하
+  ========================================================= */
+  let comboHideTimer = null;
+  function showComboText(combo) {
+    if (combo < 2) { hideComboText(); return; }
+    comboDisplay.textContent = combo % 3 === 0 ? `PERFECT x${combo} 🎆 회복!` : `PERFECT x${combo}`;
+    comboDisplay.classList.add("show");
+    clearTimeout(comboHideTimer);
+    comboHideTimer = setTimeout(hideComboText, 700);
+  }
+  function hideComboText() {
+    comboDisplay.classList.remove("show");
+  }
+
+  function spawnEdgeParticles(left, right, s) {
+    const colors = ["#ffe066", "#ff9f1c", "#ff6ec4", "#6ec9ff"];
+    const y = BASE_BOTTOM_Y - s.stack.length * BLOCK_HEIGHT + s.cameraOffset;
+    for (let i = 0; i < 10; i++) {
+      s.particles.push({
+        x: left + Math.random() * (right - left),
+        y: y,
+        vx: (Math.random() - 0.5) * 3,
+        vy: -Math.random() * 4 - 1,
+        life: 40 + Math.random() * 20,
+        color: colors[i % colors.length],
+        size: 2 + Math.random() * 3
+      });
+    }
+  }
+
+  function spawnRecoverParticles(s) {
+    const colors = ["#7bf1a8", "#ffe066", "#6ec9ff"];
+    const y = BASE_BOTTOM_Y - s.stack.length * BLOCK_HEIGHT + s.cameraOffset;
+    for (let i = 0; i < 26; i++) {
+      s.particles.push({
+        x: CW / 2 + (Math.random() - 0.5) * 60,
+        y: y,
+        vx: (Math.random() - 0.5) * 6,
+        vy: -Math.random() * 6 - 2,
+        life: 55 + Math.random() * 25,
+        color: colors[i % colors.length],
+        size: 3 + Math.random() * 3
+      });
+    }
+  }
+
+  function spawnCutParticle(mover, overlapLeft, overlapRight, s) {
+    const y = BASE_BOTTOM_Y - s.stack.length * BLOCK_HEIGHT + s.cameraOffset;
+    const cutLeft = mover.left < overlapLeft;
+    const fallX = cutLeft ? mover.left + (overlapLeft - mover.left) / 2 : overlapRight + (mover.left + mover.width - overlapRight) / 2;
+    for (let i = 0; i < 8; i++) {
+      s.particles.push({
+        x: fallX,
+        y: y,
+        vx: (Math.random() - 0.5) * 2,
+        vy: Math.random() * 2 + 1,
+        life: 40,
+        color: "#888",
+        size: 2 + Math.random() * 2,
+        gravity: 0.25
+      });
+    }
+  }
+
+  function updateParticles(s) {
+    for (let i = s.particles.length - 1; i >= 0; i--) {
+      const p = s.particles[i];
+      p.vy += (p.gravity !== undefined ? p.gravity : 0.12);
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life--;
+      if (p.life <= 0) s.particles.splice(i, 1);
+    }
+  }
+
+  function drawParticles(s) {
+    for (const p of s.particles) {
+      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / 40));
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  let celebrateTimer = null;
+  function celebrateTeacher(name, s) {
+    celebrateToast.textContent = `🎉 ${name} 완성! 🎉`;
+    celebrateToast.classList.add("show");
+    clearTimeout(celebrateTimer);
+    celebrateTimer = setTimeout(() => celebrateToast.classList.remove("show"), 1600);
+
+    const y = BASE_BOTTOM_Y - s.stack.length * BLOCK_HEIGHT + s.cameraOffset;
+    const colors = ["#ff6ec4", "#ffd86f", "#7bf1a8", "#6ec9ff", "#ff9f1c", "#ffffff"];
+    for (let i = 0; i < 90; i++) {
+      s.particles.push({
+        x: CW / 2 + (Math.random() - 0.5) * 40,
+        y: y,
+        vx: (Math.random() - 0.5) * 10,
+        vy: -Math.random() * 9 - 3,
+        life: 70 + Math.random() * 40,
+        color: colors[i % colors.length],
+        size: 2 + Math.random() * 4,
+        gravity: 0.16
+      });
+    }
+  }
+
+  function updateBannerText(s) {
+    const t = TEACHERS[s.teacherIndex];
+    teacherBanner.textContent = `🏫 ${t.name} 얼굴 완성 중... (${s.localIndex}/${t.layers})`;
+  }
+
+  /* =========================================================
+     렌더링
+  ========================================================= */
+  function drawBackground(t) {
+    const grad = ctx.createLinearGradient(0, 0, 0, CH);
+    grad.addColorStop(0, "#2a1458");
+    grad.addColorStop(0.5, "#3d1f6e");
+    grad.addColorStop(1, "#160a2e");
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, CW, CH);
+
+    ctx.save();
+    ctx.globalAlpha = 0.25;
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 53 + (t * 6) % 480) % CW;
+      const y = (i * 97 + (t * 3) % 720) % CH;
+      const r = 1 + (i % 3);
+      ctx.fillStyle = "#fff";
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.12;
+    ctx.strokeStyle = "#ffd86f";
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 3; i++) {
+      const cx = 80 + i * 160 + Math.sin(t * 0.001 + i) * 20;
+      ctx.beginPath();
+      ctx.moveTo(cx, 0);
+      ctx.lineTo(cx, CH);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawBlockImage(block, top, bottomHeight) {
+    const teacher = TEACHERS[block.teacherIndex];
+    const img = teacher.img;
+    const left = block.left;
+    const width = block.width;
+
+    if (!teacher.loaded || !img.naturalWidth) {
+      ctx.fillStyle = "#666";
+      ctx.fillRect(left, top, width, bottomHeight);
+      return;
+    }
+
+    const layers = teacher.layers;
+    const sliceFromTop = layers - 1 - block.localIndex;
+    const sh = img.naturalHeight / layers;
+    const sy = sliceFromTop * sh;
+
+    const propLeft = Math.max(0, Math.min(1, (left - block.refLeft) / block.refWidth));
+    const propRight = Math.max(0, Math.min(1, (left + width - block.refLeft) / block.refWidth));
+
+    const sx = propLeft * img.naturalWidth;
+    const sw = Math.max(1, (propRight - propLeft) * img.naturalWidth);
+
+    ctx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
+  }
+
+  function drawBlockFrame(left, top, width, height, highlight) {
+    ctx.save();
+    ctx.strokeStyle = highlight ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)";
+    ctx.lineWidth = highlight ? 2 : 1.4;
+    ctx.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
+    ctx.restore();
+  }
+
+  function render() {
+    const s = state;
+    const now = performance.now();
+    drawBackground(now);
+
+    if (!s) return;
+
+    const camOffset = s.cameraOffset;
+
+    for (let i = 0; i < s.stack.length; i++) {
+      const block = s.stack[i];
+      const { top } = blockScreenRect(s, i, camOffset);
+      drawBlockImage(block, top, BLOCK_HEIGHT);
+      drawBlockFrame(block.left, top, block.width, BLOCK_HEIGHT, i === s.stack.length - 1);
+    }
+
+    if (s.mover && s.running && !s.gameOver) {
+      const moverBlockForDraw = {
+        left: s.mover.left, width: s.mover.width,
+        teacherIndex: s.teacherIndex, localIndex: s.localIndex,
+        refLeft: s.segmentRef.left, refWidth: s.segmentRef.width
+      };
+      const { top } = blockScreenRect(s, s.stack.length, camOffset);
+      ctx.save();
+      ctx.shadowColor = "rgba(255,255,255,0.5)";
+      ctx.shadowBlur = 10;
+      drawBlockImage(moverBlockForDraw, top, BLOCK_HEIGHT);
+      ctx.restore();
+      drawBlockFrame(s.mover.left, top, s.mover.width, BLOCK_HEIGHT, true);
+    }
+
+    updateParticles(s);
+    drawParticles(s);
+  }
+
+  /* =========================================================
+     메인 루프
+  ========================================================= */
+  function update() {
+    const s = state;
+    if (!s || !s.running || s.gameOver || !s.mover) return;
+    const m = s.mover;
+    m.left += m.dir * m.speed;
+    if (m.left <= 0) { m.left = 0; m.dir = 1; }
+    if (m.left + m.width >= CW) { m.left = CW - m.width; m.dir = -1; }
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  /* =========================================================
+     게임 시작 / 리셋
+  ========================================================= */
+  function startGame() {
+    state = freshState();
+    initBaseBlock(state);
+    state.cameraOffset = computeCameraOffset(state);
+    spawnMover(state);
+    state.running = true;
+    state.gameOver = false;
+
+    scoreEl.textContent = "0";
+    updateBannerText(state);
+    hideComboText();
+    celebrateToast.classList.remove("show");
+
+    startOverlay.style.display = "none";
+    gameoverOverlay.style.display = "none";
+  }
+
+  document.getElementById("start-btn").addEventListener("click", startGame);
+  document.getElementById("restart-btn").addEventListener("click", startGame);
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      if (!state || !state.running) return;
+      dropBlock();
+    }
+  });
+
+  canvas.addEventListener("mousedown", () => {
+    if (!state || !state.running) return;
+    dropBlock();
+  });
+  canvas.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    if (!state || !state.running) return;
+    dropBlock();
+  }, { passive: false });
+
+  updateBannerText({ teacherIndex: 0, localIndex: 0 });
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
