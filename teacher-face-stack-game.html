@@ -171,6 +171,134 @@ canvas {
 }
 
 #gameover-overlay { display: none; }
+#tower-view-overlay, #ranking-overlay { display: none; }
+
+.corner-btn {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 20;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 13px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  color: #2a1200;
+  background: linear-gradient(135deg, #ffe066, #ff9f1c);
+  box-shadow: 0 4px 0 #b35c00, 0 6px 14px rgba(0,0,0,0.4);
+}
+.corner-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #b35c00; }
+
+.rank-entry-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+  margin-top: 6px;
+}
+.rank-entry-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 2px solid rgba(255,255,255,0.4);
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  font-size: 14px;
+  font-family: 'Nunito', sans-serif;
+  outline: none;
+}
+.rank-entry-row input::placeholder { color: rgba(255,255,255,0.6); }
+
+.btn.small {
+  font-size: 14px;
+  padding: 10px 18px;
+  box-shadow: 0 4px 0 #b35c00, 0 8px 16px rgba(0,0,0,0.4);
+  white-space: nowrap;
+}
+.btn.ghost {
+  color: #fff8e0;
+  background: linear-gradient(135deg, rgba(120,50,220,0.7), rgba(255,90,160,0.7));
+  box-shadow: 0 6px 0 #5a2a9e, 0 10px 20px rgba(0,0,0,0.4);
+}
+
+.rank-submit-msg {
+  min-height: 18px;
+  font-size: 13px;
+  color: #7bf1a8;
+  margin: 2px 0 0;
+}
+
+.gameover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.modal-overlay {
+  justify-content: flex-start;
+  padding-top: 60px;
+}
+.modal-title {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 24px;
+  margin: 0 0 10px;
+  color: #ffe066;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.5);
+}
+
+.tower-scroll {
+  width: 100%;
+  max-height: calc(100% - 140px);
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+  background: rgba(0,0,0,0.25);
+  border-radius: 14px;
+  padding: 12px;
+}
+.tower-scroll img {
+  width: 100%;
+  max-width: 340px;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  display: block;
+}
+
+.rank-list-wrap {
+  width: 100%;
+  max-width: 380px;
+  max-height: calc(100% - 130px);
+  overflow-y: auto;
+  background: rgba(0,0,0,0.2);
+  border-radius: 14px;
+  padding: 6px 10px;
+}
+.rank-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.14);
+  font-size: 14px;
+  text-align: left;
+}
+.rank-row:last-child { border-bottom: none; }
+.rank-row.me {
+  background: rgba(255,224,102,0.22);
+  border-radius: 8px;
+}
+.rank-row .rank-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-empty {
+  padding: 30px 10px;
+  opacity: 0.65;
+  font-size: 14px;
+}
 
 #celebrate-toast {
   position: absolute;
@@ -238,11 +366,36 @@ canvas {
   </div>
 
   <div id="gameover-overlay" class="overlay">
+    <button class="corner-btn" id="restart-btn" title="다시 하기">🔄 다시하기</button>
     <h1>GAME OVER</h1>
     <div class="stats">최종 점수: <span id="final-score">0</span></div>
     <div class="stats">완성한 선생님: <span id="final-teachers">0</span> 명</div>
     <p id="final-best-msg"></p>
-    <button class="btn" id="restart-btn">다시 하기</button>
+
+    <div class="rank-entry-row">
+      <input type="text" id="player-name-input" maxlength="10" placeholder="아이디 입력">
+      <button class="btn small" id="submit-rank-btn">랭킹 등록</button>
+    </div>
+    <p id="rank-submit-msg" class="rank-submit-msg"></p>
+
+    <div class="gameover-actions">
+      <button class="btn" id="tower-view-btn">🏗️ 내 탑 보기</button>
+      <button class="btn ghost" id="ranking-view-btn">🏆 랭킹 보기</button>
+    </div>
+  </div>
+
+  <div id="tower-view-overlay" class="overlay modal-overlay">
+    <button class="corner-btn" id="tower-close-btn">✕ 닫기</button>
+    <h2 class="modal-title">🏗️ 내가 쌓은 탑</h2>
+    <div class="tower-scroll" id="tower-scroll">
+      <img id="tower-image" alt="내가 쌓은 탑">
+    </div>
+  </div>
+
+  <div id="ranking-overlay" class="overlay modal-overlay">
+    <button class="corner-btn" id="ranking-close-btn">✕ 닫기</button>
+    <h2 class="modal-title">🏆 랭킹 TOP 10</h2>
+    <div class="rank-list-wrap" id="rank-list-wrap"></div>
   </div>
 </div>
 
@@ -300,9 +453,126 @@ canvas {
   const finalScoreEl = document.getElementById("final-score");
   const finalTeachersEl = document.getElementById("final-teachers");
   const finalBestMsgEl = document.getElementById("final-best-msg");
+  const playerNameInput = document.getElementById("player-name-input");
+  const submitRankBtn = document.getElementById("submit-rank-btn");
+  const rankSubmitMsg = document.getElementById("rank-submit-msg");
+  const towerViewBtn = document.getElementById("tower-view-btn");
+  const rankingViewBtn = document.getElementById("ranking-view-btn");
+  const towerViewOverlay = document.getElementById("tower-view-overlay");
+  const towerCloseBtn = document.getElementById("tower-close-btn");
+  const towerImageEl = document.getElementById("tower-image");
+  const rankingOverlay = document.getElementById("ranking-overlay");
+  const rankingCloseBtn = document.getElementById("ranking-close-btn");
+  const rankListWrap = document.getElementById("rank-list-wrap");
 
   let BEST = parseInt(localStorage.getItem("teacherStackBest") || "0", 10);
   bestEl.textContent = BEST;
+
+  /* =========================================================
+     랭킹 저장 (localStorage)
+  ========================================================= */
+  const RANK_KEY = "teacherStackRanking";
+
+  function loadRanking() {
+    try {
+      const list = JSON.parse(localStorage.getItem(RANK_KEY) || "[]");
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRankingEntry(entry) {
+    const list = loadRanking();
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    localStorage.setItem(RANK_KEY, JSON.stringify(list.slice(0, 30)));
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+    }[c]));
+  }
+
+  function renderRankingList(highlightTs) {
+    const list = loadRanking().slice(0, 10);
+    rankListWrap.innerHTML = "";
+    if (list.length === 0) {
+      rankListWrap.innerHTML = '<div class="rank-empty">아직 등록된 랭킹이 없습니다.<br>가장 먼저 등록해보세요!</div>';
+      return;
+    }
+    list.forEach((entry, idx) => {
+      const row = document.createElement("div");
+      row.className = "rank-row" + (highlightTs && entry.ts === highlightTs ? " me" : "");
+      row.innerHTML =
+        `<span class="rank-name">${idx + 1}. ${escapeHtml(String(entry.name))}</span>` +
+        `<span>${entry.score}점 · 선생님 ${entry.teachers}명</span>`;
+      rankListWrap.appendChild(row);
+    });
+  }
+
+  function resetRankSubmitUI() {
+    playerNameInput.value = "";
+    playerNameInput.disabled = false;
+    submitRankBtn.disabled = false;
+    rankSubmitMsg.textContent = "";
+  }
+
+  function submitRanking() {
+    const s = state;
+    if (!s) return;
+    const name = playerNameInput.value.trim().slice(0, 10);
+    if (!name) {
+      rankSubmitMsg.textContent = "아이디를 입력해주세요.";
+      return;
+    }
+    const entry = { name, score: s.score, teachers: s.completedTeachers, ts: Date.now() };
+    saveRankingEntry(entry);
+    rankSubmitMsg.textContent = "🎉 랭킹에 등록되었습니다!";
+    playerNameInput.disabled = true;
+    submitRankBtn.disabled = true;
+    renderRankingList(entry.ts);
+  }
+
+  /* =========================================================
+     내가 쌓은 탑 보기
+  ========================================================= */
+  function buildTowerImage() {
+    const s = state;
+    if (!s || s.stack.length === 0) return null;
+
+    const off = document.createElement("canvas");
+    off.width = CW;
+    const margin = 24;
+    off.height = s.stack.length * BLOCK_HEIGHT + margin;
+    const octx = off.getContext("2d");
+
+    const skyGrad = octx.createLinearGradient(0, 0, 0, off.height);
+    skyGrad.addColorStop(0, "#6fc3ff");
+    skyGrad.addColorStop(1, "#eaf7e6");
+    octx.fillStyle = skyGrad;
+    octx.fillRect(0, 0, off.width, off.height);
+
+    for (let i = 0; i < s.stack.length; i++) {
+      const block = s.stack[i];
+      const bottom = off.height - i * BLOCK_HEIGHT - (margin - 10);
+      const top = bottom - BLOCK_HEIGHT;
+      drawBlockImage(octx, block, top, BLOCK_HEIGHT);
+      octx.strokeStyle = "rgba(255,255,255,0.45)";
+      octx.lineWidth = 1;
+      octx.strokeRect(block.left + 0.5, top + 0.5, block.width - 1, BLOCK_HEIGHT - 1);
+    }
+
+    return off.toDataURL("image/png");
+  }
+
+  function openTowerView() {
+    const dataUrl = buildTowerImage();
+    if (!dataUrl) return;
+    towerImageEl.src = dataUrl;
+    towerViewOverlay.style.display = "flex";
+  }
 
   /* =========================================================
      게임 상태
@@ -465,6 +735,7 @@ canvas {
     finalScoreEl.textContent = s.score;
     finalTeachersEl.textContent = s.completedTeachers;
     finalBestMsgEl.textContent = (s.score >= BEST && s.score > 0) ? "🎉 최고 기록 달성!" : `최고 기록: ${BEST}`;
+    resetRankSubmitUI();
     gameoverOverlay.style.display = "flex";
   }
 
@@ -751,15 +1022,15 @@ canvas {
     ctx.restore();
   }
 
-  function drawBlockImage(block, top, bottomHeight) {
+  function drawBlockImage(targetCtx, block, top, bottomHeight) {
     const teacher = TEACHERS[block.teacherIndex];
     const img = teacher.img;
     const left = block.left;
     const width = block.width;
 
     if (!teacher.loaded || !img.naturalWidth) {
-      ctx.fillStyle = "#666";
-      ctx.fillRect(left, top, width, bottomHeight);
+      targetCtx.fillStyle = "#666";
+      targetCtx.fillRect(left, top, width, bottomHeight);
       return;
     }
 
@@ -774,7 +1045,7 @@ canvas {
     const sx = propLeft * img.naturalWidth;
     const sw = Math.max(1, (propRight - propLeft) * img.naturalWidth);
 
-    ctx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
+    targetCtx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
   }
 
   function drawBlockFrame(left, top, width, height, highlight) {
@@ -797,7 +1068,7 @@ canvas {
     for (let i = 0; i < s.stack.length; i++) {
       const block = s.stack[i];
       const { top } = blockScreenRect(s, i, camOffset);
-      drawBlockImage(block, top, BLOCK_HEIGHT);
+      drawBlockImage(ctx, block, top, BLOCK_HEIGHT);
       drawBlockFrame(block.left, top, block.width, BLOCK_HEIGHT, i === s.stack.length - 1);
     }
 
@@ -811,7 +1082,7 @@ canvas {
       ctx.save();
       ctx.shadowColor = "rgba(255,255,255,0.5)";
       ctx.shadowBlur = 10;
-      drawBlockImage(moverBlockForDraw, top, BLOCK_HEIGHT);
+      drawBlockImage(ctx, moverBlockForDraw, top, BLOCK_HEIGHT);
       ctx.restore();
       drawBlockFrame(s.mover.left, top, s.mover.width, BLOCK_HEIGHT, true);
     }
@@ -856,12 +1127,41 @@ canvas {
 
     startOverlay.style.display = "none";
     gameoverOverlay.style.display = "none";
+    towerViewOverlay.style.display = "none";
+    rankingOverlay.style.display = "none";
+    resetRankSubmitUI();
   }
 
   document.getElementById("start-btn").addEventListener("click", startGame);
   document.getElementById("restart-btn").addEventListener("click", startGame);
 
+  towerViewBtn.addEventListener("click", () => {
+    openTowerView();
+    gameoverOverlay.style.display = "none";
+  });
+  towerCloseBtn.addEventListener("click", () => {
+    towerViewOverlay.style.display = "none";
+    gameoverOverlay.style.display = "flex";
+  });
+
+  rankingViewBtn.addEventListener("click", () => {
+    renderRankingList(null);
+    rankingOverlay.style.display = "flex";
+    gameoverOverlay.style.display = "none";
+  });
+  rankingCloseBtn.addEventListener("click", () => {
+    rankingOverlay.style.display = "none";
+    gameoverOverlay.style.display = "flex";
+  });
+
+  submitRankBtn.addEventListener("click", submitRanking);
+  playerNameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); submitRanking(); }
+  });
+
   window.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
     if (e.code === "Space") {
       e.preventDefault();
       if (!state || !state.running) return;
