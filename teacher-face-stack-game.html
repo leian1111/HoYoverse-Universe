@@ -170,6 +170,41 @@ canvas {
   margin-top: -6px;
 }
 
+.mode-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.mode-title {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 15px;
+  color: #ffe066;
+  opacity: 0.9;
+}
+.mode-btn-row {
+  display: flex;
+  gap: 14px;
+}
+.mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 120px;
+  padding: 14px 18px;
+}
+.mode-btn .mode-num {
+  font-size: 20px;
+}
+.mode-btn .mode-desc {
+  font-size: 12px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
 #gameover-overlay { display: none; }
 #tower-view-overlay, #ranking-overlay { display: none; }
 
@@ -361,7 +396,21 @@ canvas {
   <div id="start-overlay" class="overlay">
     <h1>선생님 얼굴<br>완성 탑 쌓기</h1>
     <p>좌우로 움직이는 블록을 정확한 타이밍에 쌓아<br>선생님들의 사진을 완성해보세요!<br>완벽하게 맞추면 PERFECT 콤보가 쌓이고,<br>3연속 PERFECT 시 블록 크기가 회복됩니다.</p>
-    <button class="btn" id="start-btn">게임 시작</button>
+
+    <div class="mode-select">
+      <div class="mode-title">버전 선택</div>
+      <div class="mode-btn-row">
+        <button class="btn mode-btn" id="mode-1-btn" data-mode="1">
+          <span class="mode-num">1번</span>
+          <span class="mode-desc">이전 버전</span>
+        </button>
+        <button class="btn mode-btn" id="mode-2-btn" data-mode="2">
+          <span class="mode-num">2번</span>
+          <span class="mode-desc">실제 비율 버전</span>
+        </button>
+      </div>
+    </div>
+
     <div class="sub">Click / Tap / Space</div>
   </div>
 
@@ -430,18 +479,56 @@ canvas {
   ========================================================= */
   const canvas = document.getElementById("game-canvas");
   const ctx = canvas.getContext("2d");
-  const CW = canvas.width;
-  const CH = canvas.height;
+  const gameWrapEl = document.getElementById("game-wrap");
 
-  const BLOCK_HEIGHT = 26;
-  const INITIAL_WIDTH = 390;
-  const MIN_SPAWN_Y_SCREEN_LIMIT = 238;
-  const BASE_BOTTOM_Y = CH - 75;
-  const PERFECT_EPS = 10;
-  const RECOVER_AMOUNT = 43;
-  const BASE_SPEED = 3.5;
-  const SPEED_GROWTH_PER_BLOCK = 0.081;
-  const MAX_SPEED = 16;
+  /* =========================================================
+     화면/블록 모드 (1번: 이전 버전 - 사진이 눌리는 비율 / 2번: 실제 사진 비율)
+  ========================================================= */
+  const MODES = {
+    1: {
+      CW: 480, CH: 720,
+      BLOCK_HEIGHT: 34, INITIAL_WIDTH: 312,
+      MIN_SPAWN_Y_SCREEN_LIMIT: 190, BASE_BOTTOM_Y_OFFSET: 60,
+      PERFECT_EPS: 8, RECOVER_AMOUNT: 34,
+      BASE_SPEED: 2.8, SPEED_GROWTH_PER_BLOCK: 0.065, MAX_SPEED: 13
+    },
+    2: {
+      CW: 600, CH: 900,
+      BLOCK_HEIGHT: 26, INITIAL_WIDTH: 390,
+      MIN_SPAWN_Y_SCREEN_LIMIT: 238, BASE_BOTTOM_Y_OFFSET: 75,
+      PERFECT_EPS: 10, RECOVER_AMOUNT: 43,
+      BASE_SPEED: 3.5, SPEED_GROWTH_PER_BLOCK: 0.081, MAX_SPEED: 16
+    }
+  };
+
+  let CW, CH, BLOCK_HEIGHT, INITIAL_WIDTH, MIN_SPAWN_Y_SCREEN_LIMIT,
+      BASE_BOTTOM_Y, PERFECT_EPS, RECOVER_AMOUNT, BASE_SPEED,
+      SPEED_GROWTH_PER_BLOCK, MAX_SPEED;
+  let selectedMode = 2;
+
+  function applyMode(modeId) {
+    const m = MODES[modeId];
+    selectedMode = modeId;
+
+    CW = m.CW;
+    CH = m.CH;
+    BLOCK_HEIGHT = m.BLOCK_HEIGHT;
+    INITIAL_WIDTH = m.INITIAL_WIDTH;
+    MIN_SPAWN_Y_SCREEN_LIMIT = m.MIN_SPAWN_Y_SCREEN_LIMIT;
+    BASE_BOTTOM_Y = CH - m.BASE_BOTTOM_Y_OFFSET;
+    PERFECT_EPS = m.PERFECT_EPS;
+    RECOVER_AMOUNT = m.RECOVER_AMOUNT;
+    BASE_SPEED = m.BASE_SPEED;
+    SPEED_GROWTH_PER_BLOCK = m.SPEED_GROWTH_PER_BLOCK;
+    MAX_SPEED = m.MAX_SPEED;
+
+    canvas.width = CW;
+    canvas.height = CH;
+    gameWrapEl.style.width = CW + "px";
+    gameWrapEl.style.height = CH + "px";
+  }
+
+  applyMode(selectedMode);
 
   const scoreEl = document.getElementById("score-value");
   const bestEl = document.getElementById("best-value");
@@ -576,6 +663,15 @@ canvas {
   ========================================================= */
   let state = null;
 
+  function pickRandomTeacherIndex(excludeIndex) {
+    if (TEACHERS.length <= 1) return 0;
+    let idx;
+    do {
+      idx = Math.floor(Math.random() * TEACHERS.length);
+    } while (idx === excludeIndex);
+    return idx;
+  }
+
   function freshState() {
     return {
       running: false,
@@ -597,10 +693,11 @@ canvas {
   }
 
   function initBaseBlock(s) {
+    s.teacherIndex = pickRandomTeacherIndex(null);
     const left = (CW - INITIAL_WIDTH) / 2;
     const baseBlock = {
       left, width: INITIAL_WIDTH,
-      teacherIndex: 0, localIndex: 0,
+      teacherIndex: s.teacherIndex, localIndex: 0,
       refLeft: left, refWidth: INITIAL_WIDTH
     };
     s.stack.push(baseBlock);
@@ -702,7 +799,7 @@ canvas {
     if (isTeacherComplete) {
       s.completedTeachers++;
       celebrateTeacher(teacher.name, s);
-      s.teacherIndex = (s.teacherIndex + 1) % TEACHERS.length;
+      s.teacherIndex = pickRandomTeacherIndex(s.teacherIndex);
       s.localIndex = 0;
       s.segmentRef = { left: newLeft, width: newWidth };
       s.currentWidth = INITIAL_WIDTH;
@@ -1119,7 +1216,12 @@ canvas {
     resetRankSubmitUI();
   }
 
-  document.getElementById("start-btn").addEventListener("click", startGame);
+  document.querySelectorAll(".mode-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyMode(parseInt(btn.dataset.mode, 10));
+      startGame();
+    });
+  });
   document.getElementById("restart-btn").addEventListener("click", startGame);
 
   towerViewBtn.addEventListener("click", () => {
