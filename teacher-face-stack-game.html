@@ -559,9 +559,6 @@ canvas {
       const bottom = off.height - i * BLOCK_HEIGHT - (margin - 10);
       const top = bottom - BLOCK_HEIGHT;
       drawBlockImage(octx, block, top, BLOCK_HEIGHT);
-      octx.strokeStyle = "rgba(255,255,255,0.45)";
-      octx.lineWidth = 1;
-      octx.strokeRect(block.left + 0.5, top + 0.5, block.width - 1, BLOCK_HEIGHT - 1);
     }
 
     return off.toDataURL("image/png");
@@ -1048,14 +1045,6 @@ canvas {
     targetCtx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
   }
 
-  function drawBlockFrame(left, top, width, height, highlight) {
-    ctx.save();
-    ctx.strokeStyle = highlight ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.35)";
-    ctx.lineWidth = highlight ? 2 : 1.4;
-    ctx.strokeRect(left + 0.5, top + 0.5, width - 1, height - 1);
-    ctx.restore();
-  }
-
   function render() {
     const s = state;
     const now = performance.now();
@@ -1069,7 +1058,6 @@ canvas {
       const block = s.stack[i];
       const { top } = blockScreenRect(s, i, camOffset);
       drawBlockImage(ctx, block, top, BLOCK_HEIGHT);
-      drawBlockFrame(block.left, top, block.width, BLOCK_HEIGHT, i === s.stack.length - 1);
     }
 
     if (s.mover && s.running && !s.gameOver) {
@@ -1084,7 +1072,6 @@ canvas {
       ctx.shadowBlur = 10;
       drawBlockImage(ctx, moverBlockForDraw, top, BLOCK_HEIGHT);
       ctx.restore();
-      drawBlockFrame(s.mover.left, top, s.mover.width, BLOCK_HEIGHT, true);
     }
 
     updateParticles(s);
