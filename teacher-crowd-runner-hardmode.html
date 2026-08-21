@@ -128,6 +128,7 @@ const hitFlash = document.getElementById('hitFlash');
 const startBtn = document.getElementById('startBtn');
 
 let W, H, TRACK_W, TRACK_HALF_W, TRACK_L, TRACK_R, CENTER_X, HORIZON_Y, PLAYER_SCREEN_Y;
+let skyGradient; // 리사이즈될 때만 새로 만들고 매 프레임 재사용(GC 절감)
 function resize(){
   H = window.innerHeight;
   W = Math.min(window.innerWidth, Math.round(H*0.56));
@@ -139,6 +140,8 @@ function resize(){
   TRACK_R = CENTER_X + TRACK_HALF_W;
   HORIZON_Y = H*0.15;
   PLAYER_SCREEN_Y = H*0.84;
+  skyGradient = ctx.createLinearGradient(0,0,0,HORIZON_Y+40);
+  skyGradient.addColorStop(0,'#8fd0ff'); skyGradient.addColorStop(1,'#e8f6ff');
 }
 window.addEventListener('resize', resize);
 resize();
@@ -359,7 +362,7 @@ function update(dt){
       const dps = legion * 0.11;
       boss.hp -= dps*dt;
       if(boss.hp <= 0){
-        if(boss.phase===1) startBoss1_2();
+        if(boss.phase===1) startBoss2();
         else { state='win'; clearTime = elapsed; showOverlay(); }
       }
     }
@@ -370,8 +373,8 @@ function update(dt){
   if(legion<=0 && (state==='run'||state==='boss1'||state==='boss2')){ state='lose'; showOverlay(); }
   updateHud();
 }
-function startBoss1_2(){ startBoss2(); }
 
+const UNSHOOTABLE = { gateBlue:true, chalkPickup:true };
 function updateBullets(dt){
   const bulletSpeed = 1000;
   for(let i=bullets.length-1;i>=0;i--){
@@ -382,8 +385,10 @@ function updateBullets(dt){
     if(state==='run'){
       for(let j=entities.length-1;j>=0;j--){
         const e = entities[j];
-        if(e.kind==='gateBlue') continue;
-        if(b.z >= e.z && Math.abs(b.x - e.worldX) < 0.16){
+        if(UNSHOOTABLE[e.kind]) continue;
+        // 게이트는 트랙 전체 폭이라 항상 판정, 그 외는 좁은 히트박스로 판정
+        const withinLane = (e.kind==='gateRed') || Math.abs(b.x - e.worldX) < 0.16;
+        if(b.z >= e.z && withinLane){
           e.hp -= b.dmg;
           spawnHitSpark(e.z, e.worldX);
           if(e.hp <= 0){ destroyEntity(e); entities.splice(j,1); }
@@ -448,16 +453,23 @@ function updateParticles(dt){
   }
 }
 
-/* ================== HUD ================== */
+/* ================== HUD (값이 바뀔 때만 DOM에 씀 → 불필요한 리페인트 방지) ================== */
+let lastHudLegion='', lastHudDist='', lastHudTime='';
 function updateHud(){
-  hudLegion.textContent = `군단 ${legion}명`;
+  const legionText = `군단 ${legion}명`;
+  if(legionText !== lastHudLegion){ hudLegion.textContent = legionText; lastHudLegion = legionText; }
+
+  let distText = lastHudDist;
   if(state==='run'){
-    hudDist.textContent = `보스까지 ${Math.max(0,Math.round(DISTANCE_TO_BOSS-progress))}m`;
+    distText = `보스까지 ${Math.max(0,Math.round(DISTANCE_TO_BOSS-progress))}m`;
   } else if(state==='boss1' || state==='boss2'){
-    hudDist.textContent = `${boss.name} HP ${Math.max(0,Math.ceil(boss.hp))}/${boss.maxHp}`;
+    distText = `${boss.name} HP ${Math.max(0,Math.ceil(boss.hp))}/${boss.maxHp}`;
   }
+  if(distText !== lastHudDist){ hudDist.textContent = distText; lastHudDist = distText; }
+
   const m = Math.floor(elapsed/60), s = elapsed%60;
-  hudTime.textContent = `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;
+  const timeText = `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`;
+  if(timeText !== lastHudTime){ hudTime.textContent = timeText; lastHudTime = timeText; }
 }
 
 /* ================== 렌더링 : 3D 원근 배경 ================== */
@@ -472,13 +484,12 @@ function drawFestivalBanner(){
   ctx.fillText('★ 축제 EVENT : 선생님 군단 대탈주! ★', W/2, 20);
 }
 function drawSky(){
-  const grad = ctx.createLinearGradient(0,0,0,HORIZON_Y+40);
-  grad.addColorStop(0,'#8fd0ff'); grad.addColorStop(1,'#e8f6ff');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,W,HORIZON_Y+40);
-  petals.forEach(p=>{
+  ctx.fillStyle = skyGradient; ctx.fillRect(0,0,W,HORIZON_Y+40);
+  for(let i=0;i<petals.length;i++){
+    const p = petals[i];
     ctx.fillStyle = p.color;
     ctx.beginPath(); ctx.ellipse(p.x,p.y,p.r,p.r*0.7,p.phase,0,7); ctx.fill();
-  });
+  }
 }
 function drawSideWalls(){
   const topHalf = roadHalfWidthAt(Z_SPAWN);
@@ -543,6 +554,7 @@ function drawFloor(){
   ctx.beginPath(); ctx.moveTo(TRACK_R,H); ctx.lineTo(CENTER_X+topHalf,HORIZON_Y); ctx.stroke();
 }
 
+function byZDesc(a,b){ return b.z - a.z; }
 function render(){
   ctx.clearRect(0,0,W,H);
   drawSky();
@@ -551,24 +563,27 @@ function render(){
   drawFestivalBanner();
 
   if(state==='run'){
-    entities.slice().sort((a,b)=>b.z-a.z).forEach(drawEntity);
+    entities.sort(byZDesc); // 먼 것부터 그려야 겹칠 때 앞쪽이 위로 올라옴 (제자리 정렬, 배열 복사 없음)
+    for(let i=0;i<entities.length;i++) drawEntity(entities[i]);
   }
   if(state==='boss1'||state==='boss2'){
     drawBoss();
-    bombs.forEach(drawBomb);
+    for(let i=0;i<bombs.length;i++) drawBomb(bombs[i]);
   }
-  bullets.forEach(drawBullet);
+  for(let i=0;i<bullets.length;i++) drawBullet(bullets[i]);
   drawPlayerCrowd();
 
-  particles.forEach(p=>{
+  for(let i=0;i<particles.length;i++){
+    const p = particles[i];
     ctx.globalAlpha = clamp(p.life/0.35,0,1);
     ctx.fillStyle = p.color; ctx.beginPath();
     ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
-    ctx.globalAlpha = 1;
-  });
+  }
+  ctx.globalAlpha = 1;
 }
 
 /* ---- 게이트 / 장애물 / 적 그리기 ---- */
+const OBSTACLE_COLORS = { desk:'#c48a4d', cabinet:'#8a8fa0', hwpile:'#e2c98a' };
 function drawEntity(e){
   const s = scaleAt(e.z);
   const sy = screenYAt(e.z);
@@ -591,8 +606,7 @@ function drawEntity(e){
     }
   } else if(e.kind==='obstacle'){
     const size = 46*s;
-    const colors = { desk:'#c48a4d', cabinet:'#8a8fa0', hwpile:'#e2c98a' };
-    ctx.fillStyle = colors[e.type] || '#aaa';
+    ctx.fillStyle = OBSTACLE_COLORS[e.type] || '#aaa';
     ctx.fillRect(sx-size/2, sy-size/2, size, size);
     ctx.strokeStyle='#3a2c1c'; ctx.lineWidth=Math.max(1,2*s);
     ctx.strokeRect(sx-size/2, sy-size/2, size, size);
