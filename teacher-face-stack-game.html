@@ -170,6 +170,41 @@ canvas {
   margin-top: -6px;
 }
 
+.mode-select {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.mode-title {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 15px;
+  color: #ffe066;
+  opacity: 0.9;
+}
+.mode-btn-row {
+  display: flex;
+  gap: 14px;
+}
+.mode-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 120px;
+  padding: 14px 18px;
+}
+.mode-btn .mode-num {
+  font-size: 20px;
+}
+.mode-btn .mode-desc {
+  font-size: 12px;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
 #gameover-overlay { display: none; }
 #tower-view-overlay, #ranking-overlay { display: none; }
 
@@ -362,7 +397,19 @@ canvas {
     <h1>선생님 얼굴<br>완성 탑 쌓기</h1>
     <p>좌우로 움직이는 블록을 정확한 타이밍에 쌓아<br>선생님들의 사진을 완성해보세요!<br>완벽하게 맞추면 PERFECT 콤보가 쌓이고,<br>3연속 PERFECT 시 블록 크기가 회복됩니다.</p>
 
-    <button class="btn" id="start-btn">게임 시작</button>
+    <div class="mode-select">
+      <div class="mode-title">버전 선택</div>
+      <div class="mode-btn-row">
+        <button class="btn mode-btn" id="mode-1-btn" data-mode="1">
+          <span class="mode-num">1번</span>
+          <span class="mode-desc">이전 버전</span>
+        </button>
+        <button class="btn mode-btn" id="mode-2-btn" data-mode="2">
+          <span class="mode-num">2번</span>
+          <span class="mode-desc">실제 비율 버전</span>
+        </button>
+      </div>
+    </div>
 
     <div class="sub">Click / Tap / Space</div>
   </div>
@@ -430,7 +477,17 @@ canvas {
   const CW = canvas.width;
   const CH = canvas.height;
 
-  const BLOCK_HEIGHT = 26;
+  /* 화면 크기는 고정, 블록 비율만 버전별로 다름
+     1번: 이전 버전(사진이 눌리는 두꺼운 블록) / 2번: 실제 사진 비율(얇은 블록) */
+  const BLOCK_HEIGHT_BY_MODE = { 1: 43, 2: 26 };
+  let selectedMode = 2;
+  let BLOCK_HEIGHT = BLOCK_HEIGHT_BY_MODE[selectedMode];
+
+  function applyMode(modeId) {
+    selectedMode = modeId;
+    BLOCK_HEIGHT = BLOCK_HEIGHT_BY_MODE[modeId];
+  }
+
   const INITIAL_WIDTH = 390;
   const MIN_SPAWN_Y_SCREEN_LIMIT = 238;
   const BASE_BOTTOM_Y = CH - 75;
@@ -1126,7 +1183,12 @@ canvas {
     resetRankSubmitUI();
   }
 
-  document.getElementById("start-btn").addEventListener("click", startGame);
+  document.querySelectorAll(".mode-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      applyMode(parseInt(btn.dataset.mode, 10));
+      startGame();
+    });
+  });
   document.getElementById("restart-btn").addEventListener("click", startGame);
 
   towerViewBtn.addEventListener("click", () => {
