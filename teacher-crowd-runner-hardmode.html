@@ -153,6 +153,8 @@ function scaleAt(z){ return 1/(1+PERSP_K*Math.max(0,z)); }
 function screenYAt(z){ const s=scaleAt(z); return HORIZON_Y + s*(PLAYER_SCREEN_Y-HORIZON_Y); }
 function roadHalfWidthAt(z){ return scaleAt(z)*TRACK_HALF_W; }
 function screenXAt(z, worldX){ return CENTER_X + worldX*roadHalfWidthAt(z); }
+// 게이트/장애물/숫자가 멀리 있어도 잘 보이도록, "그리는 크기"에만 쓰는 최소 배율(실제 위치/도로 폭 계산에는 영향 없음)
+function visScaleAt(z){ return Math.max(scaleAt(z), 0.42); }
 
 /* ================== 게임 상태 ================== */
 const DISTANCE_TO_BOSS = 5200;
@@ -583,53 +585,55 @@ function render(){
 }
 
 /* ---- 게이트 / 장애물 / 적 그리기 ---- */
+/* 위치(sx,sy)와 도로 폭은 진짜 원근값(scaleAt)을 쓰고,
+   글자·박스 "크기"는 visScaleAt(최소 0.42 보장)을 써서 멀어도 숫자/색이 잘 보이게 한다. */
 const OBSTACLE_COLORS = { desk:'#c48a4d', cabinet:'#8a8fa0', hwpile:'#e2c98a' };
 function drawEntity(e){
-  const s = scaleAt(e.z);
+  const vs = visScaleAt(e.z);
   const sy = screenYAt(e.z);
   const sx = screenXAt(e.z, e.worldX);
   if(sy < HORIZON_Y-20 || sy > H+40) return;
 
   if(e.kind==='gateBlue' || e.kind==='gateRed'){
-    const hw = roadHalfWidthAt(e.z);
-    const h = 40*s;
-    ctx.fillStyle = e.kind==='gateBlue' ? 'rgba(60,140,255,0.85)' : 'rgba(230,60,60,0.85)';
+    const hw = Math.max(roadHalfWidthAt(e.z), TRACK_HALF_W*0.4);
+    const h = 46*vs;
+    ctx.fillStyle = e.kind==='gateBlue' ? 'rgba(40,120,255,0.92)' : 'rgba(230,40,40,0.92)';
     ctx.fillRect(CENTER_X-hw, sy-h/2, hw*2, h);
-    ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(1,2*s);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=Math.max(2,2.5*vs);
     ctx.strokeRect(CENTER_X-hw, sy-h/2, hw*2, h);
-    ctx.fillStyle='#fff'; ctx.font=`bold ${Math.max(9,16*s)}px 'Jua', sans-serif`; ctx.textAlign='center';
-    ctx.fillText(opLabel(e.op), CENTER_X, sy+5*s);
+    ctx.fillStyle='#fff'; ctx.font=`bold ${Math.max(19,22*vs)}px 'Jua', sans-serif`; ctx.textAlign='center';
+    ctx.fillText(opLabel(e.op), CENTER_X, sy+7*vs);
     if(e.kind==='gateRed'){
       const barW = hw*1.6;
-      ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(CENTER_X-barW/2, sy-h/2-10*s, barW, 5*s);
-      ctx.fillStyle='#ff4d6d'; ctx.fillRect(CENTER_X-barW/2, sy-h/2-10*s, barW*clamp(e.hp/e.maxHp,0,1), 5*s);
+      ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(CENTER_X-barW/2, sy-h/2-12*vs, barW, 6*vs);
+      ctx.fillStyle='#ff4d6d'; ctx.fillRect(CENTER_X-barW/2, sy-h/2-12*vs, barW*clamp(e.hp/e.maxHp,0,1), 6*vs);
     }
   } else if(e.kind==='obstacle'){
-    const size = 46*s;
+    const size = 50*vs;
     ctx.fillStyle = OBSTACLE_COLORS[e.type] || '#aaa';
     ctx.fillRect(sx-size/2, sy-size/2, size, size);
-    ctx.strokeStyle='#3a2c1c'; ctx.lineWidth=Math.max(1,2*s);
+    ctx.strokeStyle='#3a2c1c'; ctx.lineWidth=Math.max(1.5,2*vs);
     ctx.strokeRect(sx-size/2, sy-size/2, size, size);
-    ctx.fillStyle='#2a1c0c'; ctx.font=`bold ${Math.max(8,12*s)}px 'Jua', sans-serif`; ctx.textAlign='center';
-    ctx.fillText(Math.ceil(e.hp), sx, sy+size/2+12*s);
+    ctx.fillStyle='#2a1c0c'; ctx.font=`bold ${Math.max(15,16*vs)}px 'Jua', sans-serif`; ctx.textAlign='center';
+    ctx.fillText(Math.ceil(e.hp), sx, sy+size/2+15*vs);
     const barW = size;
-    ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(sx-barW/2, sy-size/2-8*s, barW, 4*s);
-    ctx.fillStyle='#41ffb0'; ctx.fillRect(sx-barW/2, sy-size/2-8*s, barW*clamp(e.hp/e.maxHp,0,1), 4*s);
+    ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(sx-barW/2, sy-size/2-9*vs, barW, 5*vs);
+    ctx.fillStyle='#41ffb0'; ctx.fillRect(sx-barW/2, sy-size/2-9*vs, barW*clamp(e.hp/e.maxHp,0,1), 5*vs);
   } else if(e.kind==='enemy'){
-    const r = 20*s;
+    const r = 22*vs;
     ctx.fillStyle = e.type==='sleepy' ? 'rgba(160,170,230,0.9)' : 'rgba(230,230,255,0.85)';
     ctx.beginPath(); ctx.arc(sx,sy,r,0,7); ctx.fill();
-    ctx.strokeStyle = e.type==='sleepy' ? '#5a5a9a' : '#9999cc'; ctx.lineWidth=Math.max(1,2*s);
+    ctx.strokeStyle = e.type==='sleepy' ? '#5a5a9a' : '#9999cc'; ctx.lineWidth=Math.max(1.5,2*vs);
     ctx.stroke();
-    ctx.fillStyle='#222'; ctx.font=`${Math.max(8,14*s)}px sans-serif`; ctx.textAlign='center';
-    ctx.fillText(e.type==='sleepy' ? '💤' : '📄', sx, sy+4*s);
+    ctx.fillStyle='#222'; ctx.font=`${Math.max(17,18*vs)}px sans-serif`; ctx.textAlign='center';
+    ctx.fillText(e.type==='sleepy' ? '💤' : '📄', sx, sy+5*vs);
   } else if(e.kind==='chalkPickup'){
-    const r = 16*s;
+    const r = 18*vs;
     ctx.save();
     ctx.translate(sx,sy); ctx.rotate(Date.now()*0.004);
     ctx.fillStyle='#ffd23f';
     ctx.fillRect(-r*0.7,-r*0.25,r*1.4,r*0.5);
-    ctx.strokeStyle='#c9a227'; ctx.lineWidth=Math.max(1,1.5*s); ctx.strokeRect(-r*0.7,-r*0.25,r*1.4,r*0.5);
+    ctx.strokeStyle='#c9a227'; ctx.lineWidth=Math.max(1.5,1.5*vs); ctx.strokeRect(-r*0.7,-r*0.25,r*1.4,r*0.5);
     ctx.restore();
   }
 }
@@ -761,36 +765,30 @@ function drawPrincipalBoss(){
   ctx.beginPath(); ctx.ellipse(0,-2,10,7,0,0,7); ctx.fill();
 }
 
-/* ================== 플레이어 군단 ================== */
+/* ================== 플레이어 군단 (줄지어 서는 대열, 회전 없음) ================== */
 function drawPlayerCrowd(){
   const py = PLAYER_SCREEN_Y;
   const px = screenXAt(0, playerWorldX);
   const n = clamp(Math.min(legion,150),1,150);
-  const spacing = 18;
-  let idx=0;
-  const startAngle = Date.now()*0.0015;
   const bob = Math.sin(Date.now()*0.006)*2;
-  for(let ring=0; idx<n; ring++){
-    const count = ring===0?1: ring*6;
-    for(let k=0;k<count && idx<n; k++, idx++){
-      let x,y;
-      if(ring===0){ x=px; y=py+bob; }
-      else {
-        const ang = startAngle + (k/count)*Math.PI*2;
-        const rad = ring*spacing;
-        x = px + Math.cos(ang)*rad;
-        y = py + Math.sin(ang)*rad*0.55 + bob;
-      }
-      drawFace(x,y, idx===0?26:19);
+
+  // 리더는 맨 앞줄 중앙에 조금 크게, 나머지는 리더 뒤로 가로줄을 채워가며 나열
+  drawFace(px, py+bob, 27);
+  const cols = 8;
+  const spacingX = 27, spacingY = 25;
+  let idx = 1, row = 0;
+  while(idx < n){
+    row++;
+    const countInRow = Math.min(cols, n-idx);
+    const rowY = py - row*spacingY + bob;
+    const startX = px - (countInRow-1)*spacingX/2;
+    for(let c=0;c<countInRow;c++, idx++){
+      drawFace(startX + c*spacingX, rowY, 19);
     }
   }
   if(legion>150){
     ctx.fillStyle='#3a2c1c'; ctx.font="bold 15px 'Jua', sans-serif"; ctx.textAlign='center';
-    ctx.fillText(`+${legion-150}`, px, py-100);
-  }
-  if(chalkBoostTimer>0){
-    ctx.strokeStyle='rgba(255,210,60,0.8)'; ctx.lineWidth=4;
-    ctx.beginPath(); ctx.arc(px,py, 140, 0, 7); ctx.stroke();
+    ctx.fillText(`+${legion-150}`, px, py - (row+1)*spacingY);
   }
 }
 function drawFace(x,y,r){
