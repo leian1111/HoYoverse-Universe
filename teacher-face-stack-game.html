@@ -669,6 +669,7 @@ canvas {
       const bottom = off.height - i * BLOCK_HEIGHT - (margin - 10);
       const top = bottom - BLOCK_HEIGHT;
       drawBlockImage(octx, block, top, BLOCK_HEIGHT);
+      drawBlockEdgeMarks(octx, block.left, top, block.width, BLOCK_HEIGHT);
     }
 
     return off.toDataURL("image/png");
@@ -1224,6 +1225,13 @@ canvas {
     targetCtx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
   }
 
+  function drawBlockEdgeMarks(targetCtx, left, top, width, height) {
+    const markWidth = 3;
+    targetCtx.fillStyle = "rgba(0,0,0,0.85)";
+    targetCtx.fillRect(left, top, markWidth, height);
+    targetCtx.fillRect(left + width - markWidth, top, markWidth, height);
+  }
+
   function render() {
     const s = state;
     const now = performance.now();
@@ -1237,6 +1245,7 @@ canvas {
       const block = s.stack[i];
       const { top } = blockScreenRect(s, i, camOffset);
       drawBlockImage(ctx, block, top, BLOCK_HEIGHT);
+      drawBlockEdgeMarks(ctx, block.left, top, block.width, BLOCK_HEIGHT);
     }
 
     if (s.mover && s.running && !s.gameOver) {
@@ -1251,6 +1260,7 @@ canvas {
       ctx.shadowBlur = 10;
       drawBlockImage(ctx, moverBlockForDraw, top, BLOCK_HEIGHT);
       ctx.restore();
+      drawBlockEdgeMarks(ctx, s.mover.left, top, s.mover.width, BLOCK_HEIGHT);
     }
 
     updateParticles(s);
