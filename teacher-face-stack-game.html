@@ -285,23 +285,64 @@ canvas {
   text-shadow: 0 2px 6px rgba(0,0,0,0.5);
 }
 
+.tower-zoom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.tower-zoom-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 18px;
+  color: #2a1200;
+  background: linear-gradient(135deg, #ffe066, #ff9f1c);
+  box-shadow: 0 3px 0 #b35c00, 0 5px 10px rgba(0,0,0,0.4);
+  line-height: 1;
+}
+.tower-zoom-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #b35c00; }
+.tower-zoom-label {
+  min-width: 52px;
+  text-align: center;
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff8e0;
+}
+.tower-zoom-reset {
+  font-family: 'Nunito', sans-serif;
+  font-weight: 700;
+  font-size: 12px;
+  color: #fff8e0;
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 14px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
 .tower-scroll {
   width: 100%;
-  max-height: calc(100% - 140px);
-  overflow-y: auto;
+  max-height: calc(100% - 190px);
+  overflow: auto;
   display: flex;
   justify-content: center;
   background: rgba(0,0,0,0.25);
   border-radius: 14px;
   padding: 12px;
+  touch-action: pan-x pan-y;
 }
 .tower-scroll img {
-  width: 100%;
-  max-width: 340px;
   height: auto;
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
   display: block;
+  flex-shrink: 0;
 }
 
 .rank-list-wrap {
@@ -436,6 +477,12 @@ canvas {
   <div id="tower-view-overlay" class="overlay modal-overlay">
     <button class="corner-btn" id="tower-close-btn">✕ 닫기</button>
     <h2 class="modal-title">🏗️ 내가 쌓은 탑</h2>
+    <div class="tower-zoom-controls">
+      <button class="tower-zoom-btn" id="tower-zoom-out-btn">−</button>
+      <span class="tower-zoom-label" id="tower-zoom-label">100%</span>
+      <button class="tower-zoom-btn" id="tower-zoom-in-btn">+</button>
+      <button class="tower-zoom-reset" id="tower-zoom-reset-btn">초기화</button>
+    </div>
     <div class="tower-scroll" id="tower-scroll">
       <img id="tower-image" alt="내가 쌓은 탑">
     </div>
@@ -519,6 +566,11 @@ canvas {
   const towerViewOverlay = document.getElementById("tower-view-overlay");
   const towerCloseBtn = document.getElementById("tower-close-btn");
   const towerImageEl = document.getElementById("tower-image");
+  const towerScrollEl = document.getElementById("tower-scroll");
+  const towerZoomInBtn = document.getElementById("tower-zoom-in-btn");
+  const towerZoomOutBtn = document.getElementById("tower-zoom-out-btn");
+  const towerZoomResetBtn = document.getElementById("tower-zoom-reset-btn");
+  const towerZoomLabel = document.getElementById("tower-zoom-label");
   const rankingOverlay = document.getElementById("ranking-overlay");
   const rankingCloseBtn = document.getElementById("ranking-close-btn");
   const rankListWrap = document.getElementById("rank-list-wrap");
@@ -627,7 +679,66 @@ canvas {
     if (!dataUrl) return;
     towerImageEl.src = dataUrl;
     towerViewOverlay.style.display = "flex";
+    setTowerZoom(1, false);
   }
+
+  /* =========================================================
+     탑 보기 확대/축소 (버튼, 마우스 휠, 두 손가락 핀치)
+  ========================================================= */
+  const TOWER_BASE_WIDTH = 340;
+  const TOWER_MIN_ZOOM = 0.4;
+  const TOWER_MAX_ZOOM = 3;
+  let towerZoom = 1;
+
+  function setTowerZoom(zoom, keepScroll) {
+    const prevZoom = towerZoom;
+    towerZoom = Math.min(TOWER_MAX_ZOOM, Math.max(TOWER_MIN_ZOOM, zoom));
+
+    if (keepScroll) {
+      const ratio = towerZoom / prevZoom;
+      towerScrollEl.scrollLeft = (towerScrollEl.scrollLeft + towerScrollEl.clientWidth / 2) * ratio - towerScrollEl.clientWidth / 2;
+      towerScrollEl.scrollTop = (towerScrollEl.scrollTop + towerScrollEl.clientHeight / 2) * ratio - towerScrollEl.clientHeight / 2;
+    }
+
+    towerImageEl.style.width = (TOWER_BASE_WIDTH * towerZoom) + "px";
+    towerZoomLabel.textContent = Math.round(towerZoom * 100) + "%";
+  }
+
+  towerZoomInBtn.addEventListener("click", () => setTowerZoom(towerZoom + 0.25, true));
+  towerZoomOutBtn.addEventListener("click", () => setTowerZoom(towerZoom - 0.25, true));
+  towerZoomResetBtn.addEventListener("click", () => setTowerZoom(1, false));
+
+  towerScrollEl.addEventListener("wheel", (e) => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    setTowerZoom(towerZoom - e.deltaY * 0.01, true);
+  }, { passive: false });
+
+  let pinchStartDist = 0;
+  let pinchStartZoom = 1;
+
+  function touchDist(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  towerScrollEl.addEventListener("touchstart", (e) => {
+    if (e.touches.length === 2) {
+      pinchStartDist = touchDist(e.touches);
+      pinchStartZoom = towerZoom;
+    }
+  }, { passive: true });
+
+  towerScrollEl.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dist = touchDist(e.touches);
+      if (pinchStartDist > 0) {
+        setTowerZoom(pinchStartZoom * (dist / pinchStartDist), false);
+      }
+    }
+  }, { passive: false });
 
   /* =========================================================
      게임 상태
