@@ -450,6 +450,10 @@ canvas {
           <span class="mode-num">2번</span>
           <span class="mode-desc">사진 늘어남</span>
         </button>
+        <button class="btn mode-btn" id="mode-3-btn" data-mode="3">
+          <span class="mode-num">3번</span>
+          <span class="mode-desc">안 맞으면 끊김</span>
+        </button>
       </div>
     </div>
 
@@ -672,6 +676,12 @@ canvas {
       const top = bottom - BLOCK_HEIGHT;
       drawBlockImage(octx, block, top, BLOCK_HEIGHT);
       drawBlockEdgeMarks(octx, block.left, top, block.width, BLOCK_HEIGHT);
+      if (imageFitMode === 3 && i > 0) {
+        const prev = s.stack[i - 1];
+        if (prev.left !== block.left || prev.width !== block.width) {
+          drawDisconnectSeam(octx, block.left, top, block.width);
+        }
+      }
     }
 
     return off.toDataURL("image/png");
@@ -1242,6 +1252,11 @@ canvas {
     targetCtx.fillRect(left + width - markWidth, top, markWidth, height);
   }
 
+  function drawDisconnectSeam(targetCtx, left, top, width) {
+    targetCtx.fillStyle = "rgba(20,20,20,0.95)";
+    targetCtx.fillRect(left, top, width, 4);
+  }
+
   function render() {
     const s = state;
     const now = performance.now();
@@ -1256,6 +1271,12 @@ canvas {
       const { top } = blockScreenRect(s, i, camOffset);
       drawBlockImage(ctx, block, top, BLOCK_HEIGHT);
       drawBlockEdgeMarks(ctx, block.left, top, block.width, BLOCK_HEIGHT);
+      if (imageFitMode === 3 && i > 0) {
+        const prev = s.stack[i - 1];
+        if (prev.left !== block.left || prev.width !== block.width) {
+          drawDisconnectSeam(ctx, block.left, top, block.width);
+        }
+      }
     }
 
     if (s.mover && s.running && !s.gameOver) {
