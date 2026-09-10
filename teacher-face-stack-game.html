@@ -536,7 +536,7 @@ canvas {
   /* 화면 크기/블록 크기는 동일하고, 사진을 채우는 방식만 버전별로 다름
      1번: 잘라서 채움(넘치는 부분은 자르고, 남는 부분은 안 늘림)
      2번: 늘리거나 눌러서 꽉 채움(사진 전체가 항상 블록 폭에 맞게 일그러짐) */
-  const BLOCK_HEIGHT = 43;
+  const BLOCK_HEIGHT = 33;
   let selectedMode = 2;
   let imageFitMode = selectedMode;
 
@@ -545,11 +545,11 @@ canvas {
     imageFitMode = modeId;
   }
 
-  const INITIAL_WIDTH = 390;
+  const INITIAL_WIDTH = 300;
   const MIN_SPAWN_Y_SCREEN_LIMIT = 238;
   const BASE_BOTTOM_Y = CH - 75;
-  const PERFECT_EPS = 10;
-  const RECOVER_AMOUNT = 43;
+  const PERFECT_EPS = 8;
+  const RECOVER_AMOUNT = 33;
   const BASE_SPEED = 3.5;
   const SPEED_GROWTH_PER_BLOCK = 0.081;
   const MAX_SPEED = 16;
