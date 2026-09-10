@@ -1269,12 +1269,28 @@ canvas {
         refLeft: s.mover.left, refWidth: s.mover.width
       };
       const { top } = blockScreenRect(s, s.stack.length, camOffset);
-      ctx.save();
-      ctx.shadowColor = "rgba(255,255,255,0.5)";
-      ctx.shadowBlur = 10;
-      drawBlockImage(ctx, moverBlockForDraw, top, BLOCK_HEIGHT);
-      ctx.restore();
-      drawBlockEdgeMarks(ctx, s.mover.left, top, s.mover.width, BLOCK_HEIGHT);
+
+      let visLeft = s.mover.left, visWidth = s.mover.width;
+      if (imageFitMode === 3) {
+        // 3번: 아래 블록과 겹치지 않는(어긋난) 부분은 날아다니는 동안에도 아예 안 보이게 잘라냄
+        const below = getTopBlock(s);
+        const clipLeft = Math.max(s.mover.left, below.left);
+        const clipRight = Math.min(s.mover.left + s.mover.width, below.left + below.width);
+        visLeft = clipLeft;
+        visWidth = Math.max(0, clipRight - clipLeft);
+      }
+
+      if (visWidth > 0) {
+        ctx.save();
+        ctx.shadowColor = "rgba(255,255,255,0.5)";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.rect(visLeft, top, visWidth, BLOCK_HEIGHT);
+        ctx.clip();
+        drawBlockImage(ctx, moverBlockForDraw, top, BLOCK_HEIGHT);
+        ctx.restore();
+        drawBlockEdgeMarks(ctx, visLeft, top, visWidth, BLOCK_HEIGHT);
+      }
     }
 
     updateParticles(s);
