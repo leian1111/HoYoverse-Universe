@@ -452,7 +452,7 @@ canvas {
         </button>
         <button class="btn mode-btn" id="mode-3-btn" data-mode="3">
           <span class="mode-num">3번</span>
-          <span class="mode-desc">안 맞으면 끊김</span>
+          <span class="mode-desc">사진 잘림</span>
         </button>
       </div>
     </div>
@@ -676,12 +676,6 @@ canvas {
       const top = bottom - BLOCK_HEIGHT;
       drawBlockImage(octx, block, top, BLOCK_HEIGHT);
       drawBlockEdgeMarks(octx, block.left, top, block.width, BLOCK_HEIGHT);
-      if (imageFitMode === 3 && i > 0) {
-        const prev = s.stack[i - 1];
-        if (prev.left !== block.left || prev.width !== block.width) {
-          drawDisconnectSeam(octx, block.left, top, block.width);
-        }
-      }
     }
 
     return off.toDataURL("image/png");
@@ -1232,8 +1226,8 @@ canvas {
     const sh = img.naturalHeight / layers;
     const sy = sliceFromTop * sh;
 
-    if (imageFitMode === 1) {
-      // 1번: 잘라서 채움 - 실제로 겹친 부분만큼만 사진을 보여주고, 늘리거나 누르지 않음
+    if (imageFitMode === 1 || imageFitMode === 3) {
+      // 1번/3번: 잘라서 채움 - 실제로 겹친 부분만큼만 사진을 보여주고, 늘리거나 누르지 않음
       const propLeft = Math.max(0, Math.min(1, (left - block.refLeft) / block.refWidth));
       const propRight = Math.max(0, Math.min(1, (left + width - block.refLeft) / block.refWidth));
       const sx = propLeft * img.naturalWidth;
@@ -1252,11 +1246,6 @@ canvas {
     targetCtx.fillRect(left + width - markWidth, top, markWidth, height);
   }
 
-  function drawDisconnectSeam(targetCtx, left, top, width) {
-    targetCtx.fillStyle = "rgba(20,20,20,0.95)";
-    targetCtx.fillRect(left, top, width, 4);
-  }
-
   function render() {
     const s = state;
     const now = performance.now();
@@ -1271,12 +1260,6 @@ canvas {
       const { top } = blockScreenRect(s, i, camOffset);
       drawBlockImage(ctx, block, top, BLOCK_HEIGHT);
       drawBlockEdgeMarks(ctx, block.left, top, block.width, BLOCK_HEIGHT);
-      if (imageFitMode === 3 && i > 0) {
-        const prev = s.stack[i - 1];
-        if (prev.left !== block.left || prev.width !== block.width) {
-          drawDisconnectSeam(ctx, block.left, top, block.width);
-        }
-      }
     }
 
     if (s.mover && s.running && !s.gameOver) {
