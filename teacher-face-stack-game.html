@@ -1257,7 +1257,7 @@ canvas {
       const moverBlockForDraw = {
         left: s.mover.left, width: s.mover.width,
         teacherIndex: s.teacherIndex, localIndex: s.localIndex,
-        refLeft: s.segmentRef.left, refWidth: s.segmentRef.width
+        refLeft: s.mover.left, refWidth: s.mover.width
       };
       const { top } = blockScreenRect(s, s.stack.length, camOffset);
       ctx.save();
