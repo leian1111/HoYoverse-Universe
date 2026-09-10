@@ -444,11 +444,11 @@ canvas {
       <div class="mode-btn-row">
         <button class="btn mode-btn" id="mode-1-btn" data-mode="1">
           <span class="mode-num">1번</span>
-          <span class="mode-desc">이전 버전</span>
+          <span class="mode-desc">사진 잘림</span>
         </button>
         <button class="btn mode-btn" id="mode-2-btn" data-mode="2">
           <span class="mode-num">2번</span>
-          <span class="mode-desc">실제 비율 버전</span>
+          <span class="mode-desc">사진 늘어남</span>
         </button>
       </div>
     </div>
@@ -529,15 +529,16 @@ canvas {
   const CW = canvas.width;
   const CH = canvas.height;
 
-  /* 화면 크기는 고정, 블록 비율만 버전별로 다름
-     1번: 이전 버전(사진이 눌리는 두꺼운 블록) / 2번: 실제 사진 비율(얇은 블록) */
-  const BLOCK_HEIGHT_BY_MODE = { 1: 65, 2: 43 };
+  /* 화면 크기/블록 크기는 동일하고, 사진을 채우는 방식만 버전별로 다름
+     1번: 잘라서 채움(넘치는 부분은 자르고, 남는 부분은 안 늘림)
+     2번: 늘리거나 눌러서 꽉 채움(사진 전체가 항상 블록 폭에 맞게 일그러짐) */
+  const BLOCK_HEIGHT = 43;
   let selectedMode = 2;
-  let BLOCK_HEIGHT = BLOCK_HEIGHT_BY_MODE[selectedMode];
+  let imageFitMode = selectedMode;
 
   function applyMode(modeId) {
     selectedMode = modeId;
-    BLOCK_HEIGHT = BLOCK_HEIGHT_BY_MODE[modeId];
+    imageFitMode = modeId;
   }
 
   const INITIAL_WIDTH = 390;
@@ -766,7 +767,8 @@ canvas {
       completedTeachers: 0,
       comboCount: 0,
       currentWidth: INITIAL_WIDTH,
-      stack: [],                // 쌓인 블록들 {left, width, teacherIndex, localIndex}
+      stack: [],                // 쌓인 블록들 {left, width, teacherIndex, localIndex, refLeft, refWidth}
+      segmentRef: { left: 0, width: INITIAL_WIDTH },
       mover: null,               // 움직이는 블록
       particles: [],
       cameraOffset: 0,
@@ -779,9 +781,11 @@ canvas {
     const left = (CW - INITIAL_WIDTH) / 2;
     const baseBlock = {
       left, width: INITIAL_WIDTH,
-      teacherIndex: s.teacherIndex, localIndex: 0
+      teacherIndex: s.teacherIndex, localIndex: 0,
+      refLeft: left, refWidth: INITIAL_WIDTH
     };
     s.stack.push(baseBlock);
+    s.segmentRef = { left, width: INITIAL_WIDTH };
     s.localIndex = 1; // 다음에 놓일 블록의 로컬 인덱스
   }
 
@@ -864,7 +868,9 @@ canvas {
       left: newLeft,
       width: newWidth,
       teacherIndex: s.teacherIndex,
-      localIndex: s.localIndex
+      localIndex: s.localIndex,
+      refLeft: s.segmentRef.left,
+      refWidth: s.segmentRef.width
     };
     s.stack.push(placedBlock);
     s.score++;
@@ -879,6 +885,7 @@ canvas {
       celebrateTeacher(teacher.name, s);
       s.teacherIndex = pickRandomTeacherIndex(s.teacherIndex);
       s.localIndex = 0;
+      s.segmentRef = { left: newLeft, width: newWidth };
       s.currentWidth = INITIAL_WIDTH;
       updateBannerText(s);
     } else {
@@ -1215,7 +1222,17 @@ canvas {
     const sh = img.naturalHeight / layers;
     const sy = sliceFromTop * sh;
 
-    targetCtx.drawImage(img, 0, sy, img.naturalWidth, sh, left, top, width, bottomHeight);
+    if (imageFitMode === 1) {
+      // 1번: 잘라서 채움 - 실제로 겹친 부분만큼만 사진을 보여주고, 늘리거나 누르지 않음
+      const propLeft = Math.max(0, Math.min(1, (left - block.refLeft) / block.refWidth));
+      const propRight = Math.max(0, Math.min(1, (left + width - block.refLeft) / block.refWidth));
+      const sx = propLeft * img.naturalWidth;
+      const sw = Math.max(1, (propRight - propLeft) * img.naturalWidth);
+      targetCtx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
+    } else {
+      // 2번: 늘리거나 눌러서 꽉 채움 - 사진 전체를 항상 블록 폭에 맞춤
+      targetCtx.drawImage(img, 0, sy, img.naturalWidth, sh, left, top, width, bottomHeight);
+    }
   }
 
   function drawBlockEdgeMarks(targetCtx, left, top, width, height) {
@@ -1244,7 +1261,8 @@ canvas {
     if (s.mover && s.running && !s.gameOver) {
       const moverBlockForDraw = {
         left: s.mover.left, width: s.mover.width,
-        teacherIndex: s.teacherIndex, localIndex: s.localIndex
+        teacherIndex: s.teacherIndex, localIndex: s.localIndex,
+        refLeft: s.mover.left, refWidth: s.mover.width
       };
       const { top } = blockScreenRect(s, s.stack.length, camOffset);
       ctx.save();
