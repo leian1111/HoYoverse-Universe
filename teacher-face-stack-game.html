@@ -766,8 +766,7 @@ canvas {
       completedTeachers: 0,
       comboCount: 0,
       currentWidth: INITIAL_WIDTH,
-      stack: [],                // 쌓인 블록들 {left, width, teacherIndex, localIndex, refLeft, refWidth}
-      segmentRef: { left: 0, width: INITIAL_WIDTH },
+      stack: [],                // 쌓인 블록들 {left, width, teacherIndex, localIndex}
       mover: null,               // 움직이는 블록
       particles: [],
       cameraOffset: 0,
@@ -780,11 +779,9 @@ canvas {
     const left = (CW - INITIAL_WIDTH) / 2;
     const baseBlock = {
       left, width: INITIAL_WIDTH,
-      teacherIndex: s.teacherIndex, localIndex: 0,
-      refLeft: left, refWidth: INITIAL_WIDTH
+      teacherIndex: s.teacherIndex, localIndex: 0
     };
     s.stack.push(baseBlock);
-    s.segmentRef = { left, width: INITIAL_WIDTH };
     s.localIndex = 1; // 다음에 놓일 블록의 로컬 인덱스
   }
 
@@ -867,9 +864,7 @@ canvas {
       left: newLeft,
       width: newWidth,
       teacherIndex: s.teacherIndex,
-      localIndex: s.localIndex,
-      refLeft: s.segmentRef.left,
-      refWidth: s.segmentRef.width
+      localIndex: s.localIndex
     };
     s.stack.push(placedBlock);
     s.score++;
@@ -884,7 +879,6 @@ canvas {
       celebrateTeacher(teacher.name, s);
       s.teacherIndex = pickRandomTeacherIndex(s.teacherIndex);
       s.localIndex = 0;
-      s.segmentRef = { left: newLeft, width: newWidth };
       s.currentWidth = INITIAL_WIDTH;
       updateBannerText(s);
     } else {
@@ -1221,13 +1215,7 @@ canvas {
     const sh = img.naturalHeight / layers;
     const sy = sliceFromTop * sh;
 
-    const propLeft = Math.max(0, Math.min(1, (left - block.refLeft) / block.refWidth));
-    const propRight = Math.max(0, Math.min(1, (left + width - block.refLeft) / block.refWidth));
-
-    const sx = propLeft * img.naturalWidth;
-    const sw = Math.max(1, (propRight - propLeft) * img.naturalWidth);
-
-    targetCtx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
+    targetCtx.drawImage(img, 0, sy, img.naturalWidth, sh, left, top, width, bottomHeight);
   }
 
   function drawBlockEdgeMarks(targetCtx, left, top, width, height) {
@@ -1256,8 +1244,7 @@ canvas {
     if (s.mover && s.running && !s.gameOver) {
       const moverBlockForDraw = {
         left: s.mover.left, width: s.mover.width,
-        teacherIndex: s.teacherIndex, localIndex: s.localIndex,
-        refLeft: s.mover.left, refWidth: s.mover.width
+        teacherIndex: s.teacherIndex, localIndex: s.localIndex
       };
       const { top } = blockScreenRect(s, s.stack.length, camOffset);
       ctx.save();
