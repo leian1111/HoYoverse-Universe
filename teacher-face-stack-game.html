@@ -1226,13 +1226,20 @@ canvas {
     const sh = img.naturalHeight / layers;
     const sy = sliceFromTop * sh;
 
-    if (imageFitMode === 1 || imageFitMode === 3) {
-      // 1번/3번: 잘라서 채움 - 실제로 겹친 부분만큼만 사진을 보여주고, 늘리거나 누르지 않음
+    if (imageFitMode === 1) {
+      // 1번: 잘라서 채움 - 선생님 사진 전체를 기준으로 실제 겹친 부분만큼만 보여주고,
+      // 층이 어긋나도 사진은 항상 자연스럽게 이어짐 (세그먼트 공통 기준점 사용)
       const propLeft = Math.max(0, Math.min(1, (left - block.refLeft) / block.refWidth));
       const propRight = Math.max(0, Math.min(1, (left + width - block.refLeft) / block.refWidth));
       const sx = propLeft * img.naturalWidth;
       const sw = Math.max(1, (propRight - propLeft) * img.naturalWidth);
       targetCtx.drawImage(img, sx, sy, sw, sh, left, top, width, bottomHeight);
+    } else if (imageFitMode === 3) {
+      // 3번: 비율(스케일)은 절대 안 바뀌고 잘리기만 하지만, 기준점을 블록 자기 자신의
+      // 왼쪽 끝으로 잡아서 층이 어긋나면 사진도 이어지지 않고 서로 안 맞게 보임
+      const propRight = Math.max(0, Math.min(1, width / INITIAL_WIDTH));
+      const sw = Math.max(1, propRight * img.naturalWidth);
+      targetCtx.drawImage(img, 0, sy, sw, sh, left, top, width, bottomHeight);
     } else {
       // 2번: 늘리거나 눌러서 꽉 채움 - 사진 전체를 항상 블록 폭에 맞춤
       targetCtx.drawImage(img, 0, sy, img.naturalWidth, sh, left, top, width, bottomHeight);
